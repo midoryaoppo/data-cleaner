@@ -1,0 +1,16 @@
+ id , Full Name ,E-mail,AGE, City ,subscribed,signup date,score,notes,legacy_code,internal
+1,  Alice Johnson ,alice@example.com,29,New York,YES,2024-01-15,"1,234.5",  VIP ,A-001,
+2,Bob Smith,bob@example.com,35,London,true,01/20/2024,"2,000",regular,A-002,
+2,Bob Smith,bob@example.com,35,London,true,01/20/2024,"2,000",regular,A-002,
+3,  Carol   White ,carol@example.com,,paris,no,2024/02/03,,,A-003,
+4,David Brown,david@example.com,42,,Y,"Mar 5, 2024",NaN,N/A,A-004,N/A
+5,Eva Green,eva@example.com,31,Berlin,false,15/03/2024,"1,050.75",,A-005,
+6,Frank  Miller,frank@example.com,28,New York,Y,2024-04-01,980,,A-006,
+7,Grace Lee,GRACE@example.com,35,London,TRUE,2024-04-01,2000,premium,A-007,
+8,Henry Ford,henry@example.com,57,Detroit,no,April 9 2024,,,A-008,
+9,Ivy Chen,ivy@example.com,24,Singapore,yes,2024-05-11,"2,340",,A-009,
+10,Jack Ryan,jack@example.com,46,New York,YES,2024-05-30,1500.00, ,A-010,
+,,,,,,,N/A,,N/A
+12,Kate  Wilson ,kate@example.com,38,Seattle,no,2024-06-15,"1,275.5",N/A,A-011,
+4,David Brown,david@example.com,42,,Y,"Mar 5, 2024",NaN,N/A,A-004,N/A
+13,Leo  Martins,leo@example.com,29,lisbon,YES,2024-07-07,900,vip,A-012,

@@ -1,0 +1,39 @@
+services:
+  - type: web
+    name: tidydata
+    runtime: node
+    plan: 0.5c-512mb
+    buildCommand: npm ci --include=dev && npm run build:css
+    startCommand: npm start
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    maxShutdownDelaySeconds: 10
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: NODE_VERSION
+        value: 22.14.0
+      - key: HOST
+        value: 0.0.0.0
+      - key: TRUST_PROXY
+        value: "true"
+      - key: APP_URL
+        sync: false
+      - key: CORS_ORIGIN
+        value: ""
+      - key: BILLING_SECRET
+        generateValue: true
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PRICE_SINGLE_ID
+        value: ""
+      - key: STRIPE_PRICE_MONTHLY_ID
+        value: ""
+      - key: ENABLE_BILLING_SANDBOX
+        value: "false"
+      - key: HIGH_VOLUME_ROW_LIMIT
+        value: "5000"
+      - key: MAX_FILE_SIZE_MB
+        value: "10"

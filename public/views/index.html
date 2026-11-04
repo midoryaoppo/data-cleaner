@@ -1,0 +1,1189 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TidyData — Clean &amp; convert CSV and JSON in seconds</title>
+    <meta
+      name="description"
+      content="Upload CSV or JSON files, remove duplicate rows, strip whitespace, fix formatting, and download clean CSV or JSON. No sign-up required."
+    />
+    <meta name="theme-color" content="#10685e" />
+    <meta property="og:title" content="TidyData — Messy data in. Clean data out." />
+    <meta
+      property="og:description"
+      content="A fast, private CSV and JSON cleaning tool. Dedupe, trim, normalize, and convert in one pass."
+    />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <script src="/js/theme.js"></script>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <script src="/js/app.js" defer></script>
+  </head>
+
+  <body class="relative min-h-screen overflow-x-hidden">
+    <svg xmlns="http://www.w3.org/2000/svg" class="hidden" aria-hidden="true">
+      <symbol id="i-logo" viewBox="0 0 24 24">
+        <path d="M12 2.25l2.4 6.35L20.75 11l-6.35 2.4L12 19.75l-2.4-6.35L3.25 11l6.35-2.4L12 2.25z" />
+        <circle cx="19" cy="19" r="2" />
+      </symbol>
+      <symbol id="i-sparkles" viewBox="0 0 24 24">
+        <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456zM16.894 20.567L16.5 21.75l-.394-1.183a2.25 2.25 0 00-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 001.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 001.423 1.423l1.183.394-1.183.394a2.25 2.25 0 00-1.423 1.423z" />
+      </symbol>
+      <symbol id="i-upload" viewBox="0 0 24 24">
+        <path d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z" />
+      </symbol>
+      <symbol id="i-file" viewBox="0 0 24 24">
+        <path d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+      </symbol>
+      <symbol id="i-refresh" viewBox="0 0 24 24">
+        <path d="M16.023 9.348h4.992V4.356M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+      </symbol>
+      <symbol id="i-check" viewBox="0 0 24 24">
+        <path d="M4.5 12.75l6 6 9-13.5" />
+      </symbol>
+      <symbol id="i-check-circle" viewBox="0 0 24 24">
+        <path d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </symbol>
+      <symbol id="i-download" viewBox="0 0 24 24">
+        <path d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+      </symbol>
+      <symbol id="i-code" viewBox="0 0 24 24">
+        <path d="M17.25 6.75L22.5 12l-5.25 5.25M6.75 17.25L1.5 12l5.25-5.25M14.25 3l-4.5 18" />
+      </symbol>
+      <symbol id="i-shield" viewBox="0 0 24 24">
+        <path d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+      </symbol>
+      <symbol id="i-sun" viewBox="0 0 24 24">
+        <path d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" />
+      </symbol>
+      <symbol id="i-moon" viewBox="0 0 24 24">
+        <path d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z" />
+      </symbol>
+      <symbol id="i-arrow-right" viewBox="0 0 24 24">
+        <path d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+      </symbol>
+      <symbol id="i-x" viewBox="0 0 24 24">
+        <path d="M6 18L18 6M6 6l12 12" />
+      </symbol>
+      <symbol id="i-chevron-down" viewBox="0 0 24 24">
+        <path d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
+      </symbol>
+      <symbol id="i-alert" viewBox="0 0 24 24">
+        <path d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+      </symbol>
+      <symbol id="i-info" viewBox="0 0 24 24">
+        <path d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+      </symbol>
+      <symbol id="i-table" viewBox="0 0 24 24">
+        <path d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5M6 3.75v16.5M12 3.75v16.5M18 3.75v16.5" />
+      </symbol>
+      <symbol id="i-copy" viewBox="0 0 24 24">
+        <path d="M15.75 15.75V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18V9a2.25 2.25 0 012.25-2.25h2.25m11.999.001h-6.75a1.5 1.5 0 00-1.5 1.5v6.75a1.5 1.5 0 001.5 1.5h6.75a1.5 1.5 0 001.5-1.5v-6.75a1.5 1.5 0 00-1.5-1.5h-.001z" />
+      </symbol>
+      <symbol id="i-trash" viewBox="0 0 24 24">
+        <path d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L5.83 5.79m14.36 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+      </symbol>
+      <symbol id="i-wand" viewBox="0 0 24 24">
+        <path d="M9.75 3.75l1.5 4.5 4.5 1.5-4.5 1.5-1.5 4.5-1.5-4.5-4.5-1.5 4.5-1.5 1.5-4.5zM18 14.25l.75 2.25 2.25.75-2.25.75L18 20.25l-.75-2.25L15 17.25l2.25-.75L18 14.25zM17.25 3.75l.375 1.125 1.125.375-1.125.375-.375 1.125-.375-1.125L15.75 5.25l1.125-.375.375-1.125z" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <path d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+      </symbol>
+      <symbol id="i-scroll" viewBox="0 0 24 24">
+        <path d="M3.75 12h16.5m0 0l-3-3m3 3l-3 3M3.75 12l3-3m-3 3l3 3" />
+      </symbol>
+      <symbol id="i-arrow-up-right" viewBox="0 0 24 24">
+        <path d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25" />
+      </symbol>
+    </svg>
+
+    <div aria-hidden="true" class="pointer-events-none fixed inset-0 -z-10 overflow-hidden">
+      <div class="bg-grid absolute inset-0"></div>
+      <div class="absolute -top-56 left-1/2 h-[38rem] w-[60rem] -translate-x-1/2 rounded-full bg-brand-200/40 blur-3xl dark:bg-brand-500/10"></div>
+      <div class="absolute -right-32 top-64 h-96 w-96 rounded-full bg-sky-200/30 blur-3xl dark:bg-sky-500/[0.07]"></div>
+      <div class="absolute -left-40 top-[42rem] h-96 w-96 rounded-full bg-emerald-100/40 blur-3xl dark:bg-emerald-500/[0.05]"></div>
+    </div>
+
+    <header
+      class="sticky top-0 z-40 border-b border-slate-200/70 bg-slate-50/80 backdrop-blur-xl dark:border-white/10 dark:bg-slate-950/80"
+    >
+      <div class="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <a
+          href="/"
+          class="flex items-center gap-2.5 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-950"
+          aria-label="TidyData home"
+        >
+          <span
+            class="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-brand-500 to-brand-800 text-white shadow-sm shadow-brand-700/25"
+          >
+            <svg class="h-5 w-5" fill="currentColor" aria-hidden="true"><use href="#i-logo" /></svg>
+          </span>
+          <span class="text-lg font-semibold tracking-tight text-slate-950 dark:text-white">TidyData</span>
+          <span class="badge badge-brand hidden sm:inline-flex">CSV · JSON</span>
+        </a>
+
+        <nav class="hidden items-center gap-6 text-sm font-medium text-slate-600 md:flex xl:gap-7 dark:text-slate-300">
+          <a class="transition hover:text-slate-950 dark:hover:text-white" href="#how-it-works">How it works</a>
+          <a class="transition hover:text-slate-950 dark:hover:text-white" href="#workspace">Clean data</a>
+          <a class="transition hover:text-slate-950 dark:hover:text-white" href="#pricing">Pricing</a>
+          <a class="transition hover:text-slate-950 dark:hover:text-white" href="#privacy">Privacy</a>
+        </nav>
+
+        <div class="flex items-center gap-1.5">
+          <span
+            id="plan-badge"
+            class="hidden items-center rounded-full border border-brand-200 bg-brand-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-brand-700 dark:border-brand-400/20 dark:bg-brand-400/10 dark:text-brand-300"
+          ></span>
+          <button
+            id="theme-toggle"
+            type="button"
+            class="icon-btn"
+            aria-label="Switch to dark theme"
+            title="Toggle color theme"
+          >
+            <svg class="h-5 w-5 dark:hidden" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <use href="#i-moon" />
+            </svg>
+            <svg class="hidden h-5 w-5 dark:block" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <use href="#i-sun" />
+            </svg>
+          </button>
+          <a href="#workspace" class="btn btn-primary hidden px-4 py-2 text-sm sm:inline-flex">
+            Start cleaning
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+              <use href="#i-arrow-right" />
+            </svg>
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="relative mx-auto max-w-6xl px-4 pt-14 sm:px-6 sm:pt-20">
+        <div class="mx-auto max-w-3xl text-center">
+          <div class="eyebrow animate-rise">
+            <span class="relative flex h-1.5 w-1.5">
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-500 opacity-70"></span>
+              <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-brand-600 dark:bg-brand-400"></span>
+            </span>
+            CSV + JSON cleaning, without the busywork
+          </div>
+          <h1
+            class="animate-rise delay-1 mt-6 text-4xl font-semibold tracking-tightest text-slate-950 sm:text-6xl dark:text-white"
+          >
+            Messy data in.
+            <span
+              class="block bg-gradient-to-r from-brand-700 via-brand-500 to-sky-500 bg-clip-text text-transparent dark:from-brand-300 dark:via-brand-400 dark:to-sky-400"
+            >
+              Clean data out.
+            </span>
+          </h1>
+          <p class="animate-rise delay-2 mx-auto mt-5 max-w-2xl text-pretty text-base leading-7 text-slate-600 sm:text-lg dark:text-slate-300">
+            Drop in a spreadsheet export or an API dump. TidyData removes duplicates, strips stray whitespace,
+            fixes messy formats, and gives you a clean CSV or JSON — in seconds.
+          </p>
+          <div
+            class="animate-rise delay-3 mt-7 flex flex-wrap items-center justify-center gap-x-5 gap-y-2.5 text-xs font-medium text-slate-500 dark:text-slate-400"
+          >
+            <span class="inline-flex items-center gap-1.5">
+              <svg class="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <use href="#i-check" />
+              </svg>
+              Duplicates, blanks &amp; whitespace
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg class="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <use href="#i-check" />
+              </svg>
+              CSV ↔ JSON conversion
+            </span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg class="h-3.5 w-3.5 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                <use href="#i-check" />
+              </svg>
+              Auto-deleted in 30 minutes
+            </span>
+          </div>
+        </div>
+
+        <div id="workspace" class="animate-rise delay-3 mx-auto mt-10 max-w-5xl scroll-mt-24 sm:mt-12">
+          <div class="card overflow-hidden">
+            <div
+              class="flex items-center justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-7 dark:border-white/5"
+            >
+              <ol class="flex flex-1 items-center gap-2 sm:gap-4" aria-label="Upload, clean, download">
+                <li class="step is-active" data-step="upload">
+                  <span class="step-dot">
+                    <span class="step-number">1</span>
+                    <svg class="step-check" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <use href="#i-check" />
+                    </svg>
+                  </span>
+                  <span>Upload</span>
+                </li>
+                <li class="h-px flex-1 bg-slate-200 dark:bg-white/10" aria-hidden="true"></li>
+                <li class="step" data-step="clean">
+                  <span class="step-dot">
+                    <span class="step-number">2</span>
+                    <svg class="step-check" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <use href="#i-check" />
+                    </svg>
+                  </span>
+                  <span>Clean</span>
+                </li>
+                <li class="h-px flex-1 bg-slate-200 dark:bg-white/10" aria-hidden="true"></li>
+                <li class="step" data-step="download">
+                  <span class="step-dot">
+                    <span class="step-number">3</span>
+                    <svg class="step-check" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true">
+                      <use href="#i-check" />
+                    </svg>
+                  </span>
+                  <span>Download</span>
+                </li>
+              </ol>
+              <span class="hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 lg:inline-flex dark:text-slate-500">
+                <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-shield" />
+                </svg>
+                Auto-deletes in 30 min
+              </span>
+            </div>
+
+            <div id="upload-panel" class="px-4 py-5 sm:px-6 sm:py-7">
+              <button
+                id="dropzone"
+                type="button"
+                class="group flex min-h-[300px] w-full flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50/60 px-6 py-12 text-center transition-colors duration-200 hover:border-brand-300 hover:bg-brand-50/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500 focus-visible:ring-offset-2 disabled:cursor-wait sm:py-14 dark:border-white/10 dark:bg-white/[0.02] dark:hover:border-brand-400/40 dark:hover:bg-brand-400/[0.04] dark:focus-visible:ring-offset-slate-950"
+                aria-describedby="upload-help"
+              >
+                <span id="drop-idle" class="flex flex-col items-center">
+                  <span
+                    class="relative grid h-16 w-16 place-items-center rounded-2xl border border-brand-100 bg-white text-brand-700 shadow-sm shadow-brand-900/5 transition-transform duration-200 group-hover:-translate-y-0.5 dark:border-brand-400/20 dark:bg-slate-900 dark:text-brand-300"
+                  >
+                    <svg class="h-7 w-7" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                      <use href="#i-upload" />
+                    </svg>
+                    <span
+                      class="absolute -right-2 -top-2 grid h-6 w-6 place-items-center rounded-full border border-white bg-brand-600 text-white shadow-sm dark:border-slate-900"
+                    >
+                      <svg class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                        <use href="#i-sparkles" />
+                      </svg>
+                    </span>
+                  </span>
+                  <span class="mt-5 text-base font-semibold text-slate-900 sm:text-lg dark:text-white">
+                    Drop your file here
+                  </span>
+                  <span class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    or <span class="font-semibold text-brand-700 dark:text-brand-300">browse files</span> from your computer
+                  </span>
+                  <span id="upload-help" class="mt-5 flex flex-wrap items-center justify-center gap-2 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+                    <span class="rounded-md border border-slate-200 bg-white px-2 py-1 dark:border-white/10 dark:bg-white/5">CSV</span>
+                    <span class="rounded-md border border-slate-200 bg-white px-2 py-1 dark:border-white/10 dark:bg-white/5">TSV</span>
+                    <span class="rounded-md border border-slate-200 bg-white px-2 py-1 dark:border-white/10 dark:bg-white/5">JSON</span>
+                    <span class="rounded-md border border-slate-200 bg-white px-2 py-1 dark:border-white/10 dark:bg-white/5">NDJSON</span>
+                    <span class="ml-1">up to 10 MB</span>
+                  </span>
+                </span>
+
+                <div id="drop-busy" class="hidden w-full">
+                  <div class="flex w-full flex-col items-center">
+                    <span
+                      class="grid h-16 w-16 place-items-center rounded-2xl border border-brand-100 bg-white text-brand-700 dark:border-brand-400/20 dark:bg-slate-900 dark:text-brand-300"
+                    >
+                      <span class="spinner h-7 w-7 border-[3px]"></span>
+                    </span>
+                    <span class="mt-5 text-base font-semibold text-slate-900 dark:text-white">Reading your file…</span>
+                    <span class="mt-1 text-sm text-slate-500 dark:text-slate-400">Checking rows, columns and structure</span>
+                    <span class="mt-5 h-1.5 w-56 overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+                      <span class="progress-indeterminate block h-full w-1/3 rounded-full bg-brand-500"></span>
+                    </span>
+                  </div>
+                </div>
+              </button>
+
+              <input
+                id="file-input"
+                type="file"
+                class="hidden"
+                accept=".csv,.tsv,.json,.ndjson,.jsonl,.txt,text/csv,application/json"
+              />
+
+              <div class="mt-4 flex flex-wrap items-center justify-between gap-3 px-1">
+                <button id="sample-btn" type="button" class="btn btn-ghost -ml-2 px-2.5 py-1.5 text-xs">
+                  <svg class="h-4 w-4 text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <use href="#i-sparkles" />
+                  </svg>
+                  No file handy? Load a messy sample
+                </button>
+                <p class="text-[11px] text-slate-400 dark:text-slate-500">No sign-up · no files written to disk</p>
+              </div>
+            </div>
+
+            <section
+              id="editor"
+              class="hidden border-t border-slate-100 px-4 py-6 sm:px-6 sm:py-8 dark:border-white/5"
+              aria-labelledby="options-title"
+            >
+              <div
+                class="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/10 dark:bg-white/[0.03]"
+              >
+                <span
+                  class="grid h-11 w-11 flex-none place-items-center rounded-xl border border-slate-200 bg-white text-brand-700 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-brand-300"
+                >
+                  <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                    <use href="#i-file" />
+                  </svg>
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p id="file-name" class="truncate text-sm font-semibold text-slate-900 dark:text-white">your-file.csv</p>
+                  <div class="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-slate-500 dark:text-slate-400">
+                    <span id="file-format" class="badge badge-brand">CSV</span>
+                    <span class="text-slate-300 dark:text-slate-600" aria-hidden="true">·</span>
+                    <span id="file-rows">0 rows</span>
+                    <span class="text-slate-300 dark:text-slate-600" aria-hidden="true">·</span>
+                    <span id="file-cols">0 columns</span>
+                    <span class="text-slate-300 dark:text-slate-600" aria-hidden="true">·</span>
+                    <span id="file-size">0 KB</span>
+                  </div>
+                </div>
+                <button id="replace-btn" type="button" class="btn btn-secondary px-3 py-2 text-xs">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <use href="#i-refresh" />
+                  </svg>
+                  Replace file
+                </button>
+              </div>
+
+              <div class="mt-7 flex items-start justify-between gap-4">
+                <div>
+                  <h2 id="options-title" class="text-lg font-semibold text-slate-950 dark:text-white">Choose your clean-up</h2>
+                  <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                    Recommended fixes are on by default. Tune the recipe to your data.
+                  </p>
+                </div>
+                <button id="reset-options" type="button" class="btn-link mt-1 flex-none text-xs disabled:opacity-50">Reset</button>
+              </div>
+
+              <p class="group-label mt-6">Structure &amp; rows</p>
+              <div class="mt-3 grid items-start gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Remove duplicate rows</span>
+                    <span class="option-desc block">Keeps the first occurrence of every repeated row.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-removeDuplicates"
+                    data-option="removeDuplicates"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Drop empty rows</span>
+                    <span class="option-desc block">Removes rows where every cell is blank.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-removeEmptyRows"
+                    data-option="removeEmptyRows"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Drop empty columns</span>
+                    <span class="option-desc block">Removes columns that contain no data at all.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-dropEmptyColumns"
+                    data-option="dropEmptyColumns"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Clean column names</span>
+                    <span class="option-desc block">Trim, lowercase, and convert headers to snake_case.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-normalizeHeaders"
+                    data-option="normalizeHeaders"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+              </div>
+
+              <div
+                id="dedupe-controls"
+                class="mt-3 flex flex-col gap-2.5 rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 dark:bg-white/[0.03]"
+              >
+                <div>
+                  <label for="dedupe-column" class="field-label">Compare duplicates using</label>
+                  <p class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">
+                    All columns by default, or pick a single key column.
+                  </p>
+                </div>
+                <div class="relative w-full flex-none sm:w-64">
+                  <select id="dedupe-column" class="select">
+                    <option value="all">All columns</option>
+                  </select>
+                  <svg
+                    class="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <use href="#i-chevron-down" />
+                  </svg>
+                </div>
+              </div>
+
+              <p class="group-label mt-6">Format values</p>
+              <div class="mt-3 grid items-start gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Trim whitespace</span>
+                    <span class="option-desc block">Removes leading and trailing spaces from every cell.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-trimWhitespace"
+                    data-option="trimWhitespace"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Normalize numbers</span>
+                    <span class="option-desc block">Turns “1,234.50” into 1234.5. Leading-zero IDs stay safe.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-normalizeNumbers"
+                    data-option="normalizeNumbers"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Normalize booleans</span>
+                    <span class="option-desc block">Converts yes / no / y / n into true / false.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-normalizeBooleans"
+                    data-option="normalizeBooleans"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Normalize dates</span>
+                    <span class="option-desc block">Common date formats become YYYY-MM-DD.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-normalizeDates"
+                    data-option="normalizeDates"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+
+                <label class="option-card">
+                  <span class="min-w-0">
+                    <span class="option-title block">Normalize empty values</span>
+                    <span class="option-desc block">“N/A”, “null”, “-” and blanks become empty cells.</span>
+                  </span>
+                  <input
+                    type="checkbox"
+                    id="opt-emptyToNull"
+                    data-option="emptyToNull"
+                    class="peer sr-only"
+                    checked
+                  />
+                  <span class="switch" aria-hidden="true"></span>
+                </label>
+              </div>
+
+              <div
+                class="mt-6 flex flex-col gap-4 border-t border-slate-100 pt-5 sm:flex-row sm:items-center sm:justify-between dark:border-white/5"
+              >
+                <p class="flex items-start gap-2 text-[11px] leading-5 text-slate-400 dark:text-slate-500">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <use href="#i-shield" />
+                  </svg>
+                  <span>Files are processed in memory and automatically deleted after 30 minutes.</span>
+                </p>
+                <button id="clean-btn" type="button" class="btn btn-primary group w-full px-5 py-3 sm:w-auto">
+                  <span id="clean-btn-spinner" class="spinner hidden h-4 w-4"></span>
+                  <svg id="clean-btn-icon" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <use href="#i-sparkles" />
+                  </svg>
+                  <span id="clean-btn-label">Clean data</span>
+                  <svg
+                    id="clean-btn-arrow"
+                    class="h-4 w-4 transition-transform group-hover:translate-x-0.5"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.8"
+                    aria-hidden="true"
+                  >
+                    <use href="#i-arrow-right" />
+                  </svg>
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      </section>
+
+      <section id="results" class="mx-auto mt-8 hidden max-w-5xl scroll-mt-24 px-4 sm:px-6" aria-labelledby="results-title">
+        <div class="card animate-rise overflow-hidden">
+          <div
+            class="flex flex-col gap-5 border-b border-slate-100 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7 dark:border-white/5"
+          >
+            <div class="flex items-start gap-3.5">
+              <span
+                class="grid h-11 w-11 flex-none place-items-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300"
+              >
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-check-circle" />
+                </svg>
+              </span>
+              <div>
+                <div class="flex flex-wrap items-center gap-2">
+                  <h2 id="results-title" class="text-lg font-semibold text-slate-950 dark:text-white">
+                    Your clean data is ready
+                  </h2>
+                  <span
+                    id="stale-note"
+                    class="hidden rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-700 dark:border-amber-400/20 dark:bg-amber-400/10 dark:text-amber-300"
+                  >
+                    Options changed
+                  </span>
+                </div>
+                <p id="results-subtitle" class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                  Your cleaned file is ready to download.
+                </p>
+              </div>
+            </div>
+            <div class="flex flex-col-reverse gap-2 sm:flex-row">
+              <button id="download-json" type="button" class="btn btn-secondary">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-code" />
+                </svg>
+                JSON
+              </button>
+              <button id="download-csv" type="button" class="btn btn-primary">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-download" />
+                </svg>
+                Download CSV
+              </button>
+            </div>
+          </div>
+
+          <div
+            id="paywall-note"
+            class="hidden flex-col gap-3 border-b border-amber-100 bg-amber-50/70 px-5 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-7 dark:border-amber-400/10 dark:bg-amber-400/[0.06]"
+          >
+            <div class="flex items-start gap-2.5">
+              <svg class="mt-0.5 h-4 w-4 flex-none text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-lock" />
+              </svg>
+              <p class="text-xs leading-5 text-amber-800 dark:text-amber-200">
+                <span class="font-semibold">This export is above the free limit.</span>
+                <span id="paywall-copy"> Buy a single export pass or subscribe for unlimited downloads.</span>
+              </p>
+            </div>
+            <button id="unlock-btn" type="button" class="btn btn-secondary flex-none border-amber-200 bg-white/80 px-3 py-2 text-xs text-amber-900 hover:bg-white dark:border-amber-400/20 dark:bg-white/5 dark:text-amber-200 dark:hover:bg-white/10">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-sparkles" />
+              </svg>
+              Unlock for <span id="paywall-price">$5</span>
+            </button>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2.5 p-5 sm:p-7 lg:grid-cols-4">
+            <div class="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Rows kept</p>
+                <svg class="h-4 w-4 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <use href="#i-table" />
+                </svg>
+              </div>
+              <p class="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-slate-950 dark:text-white">
+                <span id="stat-rows">0</span>
+              </p>
+              <p id="stat-rows-sub" class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">of 0 rows</p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Duplicates</p>
+                <svg class="h-4 w-4 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <use href="#i-copy" />
+                </svg>
+              </div>
+              <p class="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-slate-950 dark:text-white">
+                <span id="stat-dupes">0</span>
+              </p>
+              <p id="stat-dupes-sub" class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">repeated rows removed</p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Empties</p>
+                <svg class="h-4 w-4 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <use href="#i-trash" />
+                </svg>
+              </div>
+              <p class="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-slate-950 dark:text-white">
+                <span id="stat-empty">0</span>
+              </p>
+              <p id="stat-empty-sub" class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">0 rows · 0 columns</p>
+            </div>
+
+            <div class="rounded-2xl border border-slate-100 bg-slate-50/60 p-3.5 dark:border-white/5 dark:bg-white/[0.02]">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400 dark:text-slate-500">Cells fixed</p>
+                <svg class="h-4 w-4 text-slate-300 dark:text-slate-600" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                  <use href="#i-wand" />
+                </svg>
+              </div>
+              <p class="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-slate-950 dark:text-white">
+                <span id="stat-cells">0</span>
+              </p>
+              <p id="stat-cells-sub" class="mt-0.5 text-[11px] text-slate-400 dark:text-slate-500">trimmed &amp; normalized</p>
+            </div>
+          </div>
+
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/50 px-5 py-3 text-[11px] text-slate-400 sm:px-7 dark:border-white/5 dark:bg-white/[0.02] dark:text-slate-500"
+          >
+            <span id="cleaned-note">Downloads expire in 30 minutes.</span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-lock" />
+              </svg>
+              Original file stays untouched
+            </span>
+          </div>
+          <div id="warnings-note" class="hidden border-t border-amber-100 bg-amber-50/60 px-5 py-3 text-xs text-amber-800 sm:px-7 dark:border-amber-400/10 dark:bg-amber-400/[0.06] dark:text-amber-200"></div>
+        </div>
+      </section>
+
+      <section id="preview-section" class="mx-auto mt-6 hidden max-w-6xl px-4 sm:px-6" aria-labelledby="preview-title">
+        <div class="card relative overflow-hidden">
+          <div
+            id="preview-loading"
+            class="absolute inset-0 z-20 hidden flex-col items-center justify-center gap-3 bg-white/75 backdrop-blur-sm dark:bg-slate-950/75"
+            role="status"
+          >
+            <span class="spinner h-6 w-6 border-[3px] text-brand-600 dark:text-brand-400"></span>
+            <span id="preview-loading-text" class="text-sm font-medium text-slate-600 dark:text-slate-300">Cleaning your data…</span>
+          </div>
+
+          <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-5 py-4 dark:border-white/5">
+            <div class="flex items-center gap-2.5">
+              <h2 id="preview-title" class="text-sm font-semibold text-slate-900 dark:text-white">Data preview</h2>
+              <span id="preview-count-badge" class="badge">0 rows</span>
+            </div>
+            <div
+              role="tablist"
+              aria-label="Preview mode"
+              class="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/5"
+            >
+              <button
+                id="tab-original"
+                type="button"
+                role="tab"
+                aria-selected="true"
+                aria-controls="preview-panel"
+                class="preview-tab"
+              >
+                Original
+              </button>
+              <button
+                id="tab-cleaned"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="preview-panel"
+                class="preview-tab"
+                disabled
+              >
+                Cleaned
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-5 py-2.5 text-[11px] text-slate-400 dark:border-white/5 dark:text-slate-500"
+          >
+            <span id="preview-meta">Showing the first 50 rows</span>
+            <span class="inline-flex items-center gap-1.5">
+              <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-scroll" />
+              </svg>
+              Scroll sideways for every column
+            </span>
+          </div>
+
+          <div id="preview-panel" role="tabpanel" class="scrollbar-thin max-h-[30rem] overflow-auto">
+            <table class="data-table" aria-label="Data preview">
+              <thead id="preview-thead"></thead>
+              <tbody id="preview-tbody"></tbody>
+            </table>
+          </div>
+
+          <div
+            class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-5 py-3 text-[11px] text-slate-400 dark:border-white/5 dark:text-slate-500"
+          >
+            <span>Previews are limited to 50 rows. Downloads include every row.</span>
+            <span id="preview-cols">0 columns</span>
+          </div>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="mx-auto mt-24 max-w-6xl scroll-mt-24 px-4 sm:px-6">
+        <div class="mx-auto max-w-2xl text-center">
+          <p class="group-label !text-brand-600 dark:!text-brand-400">How it works</p>
+          <h2 class="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl dark:text-white">
+            From file to finished in three steps.
+          </h2>
+          <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            No accounts, no spreadsheet formulas, and no cleanup scripts. Just a calmer way to prep your data.
+          </p>
+        </div>
+
+        <div class="mt-10 grid gap-4 md:grid-cols-3">
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift dark:border-white/10 dark:bg-slate-900/50 dark:hover:border-brand-400/30">
+            <span class="absolute right-5 top-5 text-xs font-semibold tabular-nums text-slate-300 dark:text-slate-600">01</span>
+            <span class="grid h-11 w-11 place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                <use href="#i-upload" />
+              </svg>
+            </span>
+            <h3 class="mt-5 text-base font-semibold text-slate-900 dark:text-white">Start with any messy file</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Drop in CSV, TSV, JSON, or NDJSON. TidyData reads the structure and gives you an instant preview.
+            </p>
+          </div>
+
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift dark:border-white/10 dark:bg-slate-900/50 dark:hover:border-brand-400/30">
+            <span class="absolute right-5 top-5 text-xs font-semibold tabular-nums text-slate-300 dark:text-slate-600">02</span>
+            <span class="grid h-11 w-11 place-items-center rounded-xl bg-sky-50 text-sky-700 dark:bg-sky-400/10 dark:text-sky-300">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                <use href="#i-wand" />
+              </svg>
+            </span>
+            <h3 class="mt-5 text-base font-semibold text-slate-900 dark:text-white">Pick your clean-up recipe</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Remove duplicates, drop blanks, trim whitespace, and normalize numbers, dates, and booleans in one pass.
+            </p>
+          </div>
+
+          <div class="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lift dark:border-white/10 dark:bg-slate-900/50 dark:hover:border-brand-400/30">
+            <span class="absolute right-5 top-5 text-xs font-semibold tabular-nums text-slate-300 dark:text-slate-600">03</span>
+            <span class="grid h-11 w-11 place-items-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-400/10 dark:text-emerald-300">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true">
+                <use href="#i-download" />
+              </svg>
+            </span>
+            <h3 class="mt-5 text-base font-semibold text-slate-900 dark:text-white">Download clean data</h3>
+            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              Grab a spreadsheet-ready CSV or a tidy JSON array, review the before-and-after stats, and you're done.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section id="pricing" class="mx-auto mt-24 max-w-6xl scroll-mt-24 px-4 sm:px-6">
+        <div class="mx-auto max-w-2xl text-center">
+          <p class="group-label !text-brand-600 dark:!text-brand-400">Pricing</p>
+          <h2 class="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl dark:text-white">
+            Free for small files. Pay only when you scale.
+          </h2>
+          <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
+            Clean, preview, and export everyday files for free. When a download crosses the free row limit, grab a
+            one-time pass or subscribe for unlimited exports.
+          </p>
+          <p
+            id="pricing-mode-note"
+            class="mt-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-medium text-slate-500 shadow-sm dark:border-white/10 dark:bg-white/5 dark:text-slate-400"
+          >
+            <span class="h-1.5 w-1.5 flex-none rounded-full bg-emerald-500"></span>
+            <span id="pricing-mode-text">Secure checkout via Stripe</span>
+          </p>
+        </div>
+
+        <div class="mt-10 grid items-start gap-4 lg:grid-cols-3">
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900/50">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-white">Free</h3>
+              <span class="badge">No card</span>
+            </div>
+            <p class="mt-4 flex items-baseline gap-1">
+              <span class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">$0</span>
+              <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ forever</span>
+            </p>
+            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              For quick cleanups, small exports, and getting a feel for TidyData.
+            </p>
+            <a href="#workspace" class="btn btn-secondary mt-5 w-full">
+              Start cleaning
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-arrow-right" />
+              </svg>
+            </a>
+            <ul class="mt-6 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                Free downloads up to <span id="pricing-free-limit" class="font-semibold">5,000</span> rows
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                Every cleaning option and live preview
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                CSV and JSON conversion
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                Files auto-deleted after 30 minutes
+              </li>
+            </ul>
+          </div>
+
+          <div class="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900/50">
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-base font-semibold text-slate-900 dark:text-white">Export pass</h3>
+              <span class="badge">One-time</span>
+            </div>
+            <p class="mt-4 flex items-baseline gap-1">
+              <span id="pricing-single-price" class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">$5</span>
+              <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ one export</span>
+            </p>
+            <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+              One large file, one clean download. No subscription and no account required.
+            </p>
+            <button type="button" data-checkout-plan="single" class="btn btn-secondary mt-5 w-full">
+              Buy export pass
+              <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-arrow-right" />
+              </svg>
+            </button>
+            <ul class="mt-6 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                One high-volume CSV or JSON download
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                Pass stays valid for 24 hours
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                Secure Stripe Checkout
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                Works with any file size we support
+              </li>
+            </ul>
+          </div>
+
+          <div class="relative overflow-hidden rounded-2xl border-2 border-brand-600 bg-gradient-to-br from-brand-50 via-white to-sky-50 p-6 shadow-lift dark:border-brand-400/70 dark:from-brand-950/70 dark:via-slate-900/70 dark:to-slate-950">
+            <div class="pointer-events-none absolute -right-12 -top-12 h-40 w-40 rounded-full bg-brand-200/50 blur-2xl dark:bg-brand-500/10"></div>
+            <div class="relative">
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-base font-semibold text-slate-900 dark:text-white">Monthly</h3>
+                <span class="badge badge-brand">Best value</span>
+              </div>
+              <p class="mt-4 flex items-baseline gap-1">
+                <span id="pricing-monthly-price" class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">$19</span>
+                <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ month</span>
+              </p>
+              <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
+                For regular data work and teams that export large files often.
+              </p>
+              <button type="button" data-checkout-plan="monthly" class="btn btn-primary mt-5 w-full">
+                Subscribe monthly
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-arrow-right" />
+                </svg>
+              </button>
+              <ul class="mt-6 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
+                <li class="flex items-start gap-2">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                  Unlimited high-volume exports
+                </li>
+                <li class="flex items-start gap-2">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                  Every cleaning option and format
+                </li>
+                <li class="flex items-start gap-2">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                  Month-to-month, no long-term lock-in
+                </li>
+                <li class="flex items-start gap-2">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                  No account setup required
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <p class="mt-5 text-center text-[11px] leading-5 text-slate-400 dark:text-slate-500">
+          Prices in USD. High-volume exports are downloads above the free row limit. Sandbox checkout lets you try the
+          full flow without a real charge.
+        </p>
+      </section>
+
+      <section id="privacy" class="mx-auto mt-6 max-w-6xl scroll-mt-24 px-4 sm:px-6">
+        <div
+          class="relative overflow-hidden rounded-3xl border border-brand-100 bg-gradient-to-br from-brand-50 via-white to-sky-50 px-6 py-8 sm:px-10 sm:py-10 dark:border-brand-400/15 dark:from-brand-950/60 dark:via-slate-900/60 dark:to-slate-950"
+        >
+          <div class="pointer-events-none absolute -right-16 -top-16 h-56 w-56 rounded-full bg-brand-200/40 blur-3xl dark:bg-brand-500/10"></div>
+          <div class="relative grid items-center gap-8 lg:grid-cols-[1.2fr_1fr]">
+            <div>
+              <span class="badge badge-brand">Private by default</span>
+              <h2 class="mt-4 text-2xl font-semibold tracking-tight text-slate-950 dark:text-white">Your data doesn't linger.</h2>
+              <p class="mt-3 max-w-xl text-sm leading-6 text-slate-600 dark:text-slate-300">
+                Files are parsed in memory on this server — never written to disk, never sent to a third party, and
+                automatically purged after 30 minutes. No account, no tracking, no mystery.
+              </p>
+              <a href="#workspace" class="btn btn-primary mt-6 px-4 py-2.5 text-sm">
+                Clean your first file
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-arrow-up-right" />
+                </svg>
+              </a>
+            </div>
+            <div class="grid gap-3">
+              <div class="flex items-start gap-3 rounded-xl border border-white/70 bg-white/70 p-3.5 backdrop-blur dark:border-white/10 dark:bg-white/5">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-300" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <use href="#i-check" />
+                </svg>
+                <div>
+                  <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">Nothing written to disk</p>
+                  <p class="mt-0.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Parsed in memory, wiped on a timer.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 rounded-xl border border-white/70 bg-white/70 p-3.5 backdrop-blur dark:border-white/10 dark:bg-white/5">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-300" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <use href="#i-check" />
+                </svg>
+                <div>
+                  <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">No third-party services</p>
+                  <p class="mt-0.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Your rows never leave this app.</p>
+                </div>
+              </div>
+              <div class="flex items-start gap-3 rounded-xl border border-white/70 bg-white/70 p-3.5 backdrop-blur dark:border-white/10 dark:bg-white/5">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-300" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                  <use href="#i-check" />
+                </svg>
+                <div>
+                  <p class="text-xs font-semibold text-slate-800 dark:text-slate-100">You're in control</p>
+                  <p class="mt-0.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400">Preview every change before downloading.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="mx-auto mt-20 max-w-6xl border-t border-slate-200 px-4 py-8 sm:px-6 dark:border-white/10">
+      <div class="flex flex-col items-center justify-between gap-4 text-center sm:flex-row sm:text-left">
+        <div class="flex items-center gap-2.5">
+          <span
+            class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-500 to-brand-800 text-white"
+          >
+            <svg class="h-4 w-4" fill="currentColor" aria-hidden="true"><use href="#i-logo" /></svg>
+          </span>
+          <div>
+            <p class="text-sm font-semibold text-slate-900 dark:text-white">TidyData</p>
+            <p class="text-[11px] text-slate-400 dark:text-slate-500">© <span id="year">2026</span> · Built for cleaner spreadsheets</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[11px] font-medium text-slate-400 dark:text-slate-500">
+          <span>Node.js · Express · Tailwind CSS</span>
+          <a class="transition hover:text-brand-700 dark:hover:text-brand-300" href="/api/health" target="_blank" rel="noreferrer">API status</a>
+        </div>
+      </div>
+    </footer>
+
+    <div
+      id="checkout-modal"
+      class="fixed inset-0 z-50 hidden"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="checkout-title"
+      aria-describedby="checkout-description"
+    >
+      <div class="absolute inset-0 bg-slate-950/60 backdrop-blur-sm" data-close-checkout aria-hidden="true"></div>
+      <div class="relative flex min-h-full items-end justify-center p-3 sm:items-center sm:p-6">
+        <div
+          class="max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-3xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-slate-900"
+        >
+          <div class="flex items-start justify-between gap-4 border-b border-slate-100 px-5 py-4 sm:px-6 dark:border-white/5">
+            <div>
+              <p class="group-label text-brand-600 dark:text-brand-400">Checkout</p>
+              <h2 id="checkout-title" class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+                Unlock high-volume exports
+              </h2>
+              <p id="checkout-description" class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
+                Choose a one-time pass or a monthly plan. You'll only pay when you export a large file.
+              </p>
+            </div>
+            <button id="checkout-close" type="button" class="icon-btn -mr-1 -mt-1 flex-none" aria-label="Close checkout">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-x" />
+              </svg>
+            </button>
+          </div>
+
+          <div class="space-y-4 px-5 py-5 sm:px-6">
+            <div
+              id="checkout-error"
+              class="hidden rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-3 text-xs leading-5 text-rose-700 dark:border-rose-400/20 dark:bg-rose-500/10 dark:text-rose-300"
+              role="alert"
+            ></div>
+
+            <div
+              id="checkout-entitlement"
+              class="hidden rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-3 text-xs leading-5 text-emerald-800 dark:border-emerald-400/20 dark:bg-emerald-500/10 dark:text-emerald-300"
+            ></div>
+
+            <fieldset>
+              <legend class="sr-only">Choose a plan</legend>
+              <div class="space-y-2.5">
+                <label class="plan-card">
+                  <input class="peer sr-only" type="radio" name="checkout-plan" value="single" checked />
+                  <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-slate-100 text-slate-600 dark:bg-white/5 dark:text-slate-300">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <use href="#i-download" />
+                    </svg>
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="block text-sm font-semibold text-slate-900 dark:text-white">Export pass</span>
+                    <span class="mt-0.5 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                      One high-volume download · valid 24 hours
+                    </span>
+                  </span>
+                  <span id="checkout-single-price" class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">$5</span>
+                </label>
+
+                <label class="plan-card">
+                  <input class="peer sr-only" type="radio" name="checkout-plan" value="monthly" />
+                  <span class="grid h-9 w-9 flex-none place-items-center rounded-xl bg-brand-50 text-brand-700 dark:bg-brand-400/10 dark:text-brand-300">
+                    <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                      <use href="#i-sparkles" />
+                    </svg>
+                  </span>
+                  <span class="min-w-0 flex-1">
+                    <span class="flex flex-wrap items-center gap-1.5">
+                      <span class="text-sm font-semibold text-slate-900 dark:text-white">Monthly plan</span>
+                      <span class="rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-400/15 dark:text-brand-300">Unlimited</span>
+                    </span>
+                    <span class="mt-0.5 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                      Unlimited high-volume exports · month-to-month
+                    </span>
+                  </span>
+                  <span id="checkout-monthly-price" class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">$19</span>
+                </label>
+              </div>
+            </fieldset>
+
+            <div
+              id="checkout-sandbox-row"
+              class="flex items-center justify-between gap-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 dark:border-white/10 dark:bg-white/[0.02]"
+            >
+              <div class="min-w-0">
+                <label for="sandbox-toggle" class="cursor-pointer text-xs font-semibold text-slate-800 dark:text-slate-100">
+                  Sandbox mode
+                </label>
+                <p class="mt-0.5 text-[11px] leading-5 text-slate-500 dark:text-slate-400">
+                  Simulate the purchase without a real card or charge.
+                </p>
+              </div>
+              <input id="sandbox-toggle" type="checkbox" class="peer sr-only" />
+              <label for="sandbox-toggle" class="switch cursor-pointer" aria-hidden="true"></label>
+            </div>
+
+            <div
+              class="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-3 text-[11px] leading-5 text-slate-500 dark:border-white/10 dark:bg-white/[0.02] dark:text-slate-400"
+            >
+              <svg class="mt-0.5 h-4 w-4 flex-none text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-shield" />
+              </svg>
+              <span id="checkout-mode-text">Secure checkout via Stripe. You can cancel before paying.</span>
+            </div>
+
+            <div class="flex items-end justify-between gap-3 border-t border-slate-100 pt-4 dark:border-white/5">
+              <div>
+                <p class="group-label">Total today</p>
+                <p id="checkout-total" class="mt-1 text-2xl font-semibold tabular-nums tracking-tight text-slate-950 dark:text-white">$5</p>
+              </div>
+              <p id="checkout-recurring-note" class="pb-1 text-right text-[11px] leading-5 text-slate-400 dark:text-slate-500">
+                One-time payment
+              </p>
+            </div>
+
+            <button id="checkout-submit" type="button" class="btn btn-primary w-full px-4 py-3">
+              <span id="checkout-submit-spinner" class="spinner hidden h-4 w-4"></span>
+              <span id="checkout-submit-label">Continue to Stripe</span>
+              <svg id="checkout-submit-arrow" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                <use href="#i-arrow-right" />
+              </svg>
+            </button>
+
+            <p id="checkout-legal-note" class="text-center text-[10px] leading-5 text-slate-400 dark:text-slate-500">
+              Payments are processed securely by Stripe. No card details touch this server.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div
+      id="toast-stack"
+      class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4 sm:items-end sm:p-6"
+      aria-live="polite"
+      aria-atomic="false"
+    ></div>
+  </body>
+</html>
