@@ -3,16 +3,25 @@
 
   var MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
   var WORKSPACE_KEY = 'tidydata:workspace:v1';
+  var PENDING_KEY = 'tidydata:pending-action:v1';
   var DEFAULT_BILLING = {
     sandboxEnabled: false,
     stripeConfigured: false,
     stripeMode: 'disabled',
     highVolumeRowLimit: 5000,
+    freeTier: {
+      maxRows: 500,
+      maxFileSizeBytes: 1024 * 1024,
+      maxFileSizeMb: 1,
+    },
+    premiumExportFormats: ['ndjson', 'tsv'],
+    bulkMaxFiles: 10,
     prices: {
       single: { amountCents: 500, display: '$5' },
       monthly: { amountCents: 1900, display: '$19' },
     },
     entitlement: null,
+    premium: false,
   };
   var DEFAULT_OPTIONS = {
     removeDuplicates: true,
@@ -38,6 +47,9 @@
     checkoutBusy: false,
     sandboxTouched: false,
     checkoutTrigger: null,
+    checkoutReason: null,
+    checkoutFormat: null,
+    paywallReason: null,
   };
 
   function $(id) {
@@ -85,6 +97,8 @@
     warningsNote: $('warnings-note'),
     downloadCsv: $('download-csv'),
     downloadJson: $('download-json'),
+    downloadNdjson: $('download-ndjson'),
+    downloadTsv: $('download-tsv'),
     previewSection: $('preview-section'),
     previewLoading: $('preview-loading'),
     previewLoadingText: $('preview-loading-text'),
@@ -97,12 +111,18 @@
     tabCleaned: $('tab-cleaned'),
     planBadge: $('plan-badge'),
     paywallNote: $('paywall-note'),
+    paywallTitle: $('paywall-title'),
     paywallCopy: $('paywall-copy'),
     paywallPrice: $('paywall-price'),
+    freeLimitNote: $('free-limit-note'),
+    freeLimitCopy: $('free-limit-copy'),
+    freeLimitUpgrade: $('free-limit-upgrade'),
+    freeLimitPrice: $('free-limit-price'),
     unlockBtn: $('unlock-btn'),
     pricingSinglePrice: $('pricing-single-price'),
     pricingMonthlyPrice: $('pricing-monthly-price'),
     pricingFreeLimit: $('pricing-free-limit'),
+    pricingFreeSize: $('pricing-free-size'),
     pricingModeNote: $('pricing-mode-note'),
     pricingModeText: $('pricing-mode-text'),
     checkoutModal: $('checkout-modal'),
@@ -121,6 +141,8 @@
     checkoutLegalNote: $('checkout-legal-note'),
     checkoutSinglePrice: $('checkout-single-price'),
     checkoutMonthlyPrice: $('checkout-monthly-price'),
+    checkoutFreeRows: $('checkout-free-rows'),
+    checkoutFreeSize: $('checkout-free-size'),
   };
 
   var optionInputs = Array.prototype.slice.call(document.querySelectorAll('[data-option]'));
@@ -403,7 +425,11 @@
         payload && payload.error && payload.error.message
           ? payload.error.message
           : 'The request failed with status ' + response.status + '.';
-      throw new Error(message);
+      var error = new Error(message);
+      error.status = response.status;
+      error.payload = payload;
+      error.code = payload && payload.error ? payload.error.code : null;
+      throw error;
     }
 
     if (!payload) throw new Error('The server returned an unexpected response.');
@@ -445,10 +471,12 @@
     dom.fileSize.textContent = formatBytes(file.size);
   }
 
-  function handleUploadSuccess(file) {
+  function handleUploadSuccess(file, access) {
     state.file = file;
+    state.file.access = access || null;
     state.cleaned = null;
     state.activeTab = 'original';
+    state.paywallReason = null;
 
     dom.uploadPanel.classList.add('hidden');
     dom.editor.classList.remove('hidden');
@@ -466,10 +494,17 @@
     resetOptionInputs();
     renderPreview('original');
     setStep('clean');
+    updateFreeLimitNote();
     persistWorkspace();
 
     if (file.rowCount === 0) {
       showToast('info', 'Headers found, but no data rows', 'You can still adjust options, but there is nothing to clean yet.');
+    } else if (access && access.allowed === false) {
+      showToast(
+        'info',
+        'Large file loaded',
+        'You can preview it now. Upgrade when you are ready to clean and download it.',
+      );
     } else {
       showToast(
         'success',
@@ -504,7 +539,7 @@
       formData.append('file', file);
       var response = await fetch('/api/upload', { method: 'POST', body: formData });
       var payload = await readJsonResponse(response);
-      handleUploadSuccess(payload.file);
+      handleUploadSuccess(payload.file, payload.access);
       deleteServerFile(previousFileId);
       deleteServerFile(previousCleanedId);
     } catch (error) {
@@ -771,6 +806,7 @@
 
     dom.staleNote.classList.add('hidden');
     updatePaywall();
+    updateFreeLimitNote();
   }
 
   /* ------------------------------------------------------------------ */
@@ -793,6 +829,7 @@
 
       state.cleaned = cleaned;
       state.activeTab = 'cleaned';
+      state.paywallReason = null;
       dom.tabCleaned.disabled = false;
       persistWorkspace();
       renderResults(cleaned);
@@ -821,7 +858,15 @@
       }
       cleanedSuccessfully = true;
     } catch (error) {
-      showToast('error', 'Could not clean that file', friendlyError(error));
+      if (error.status === 402) {
+        if (error.payload && error.payload.billing) applyBilling(error.payload.billing);
+        state.paywallReason = 'CLEAN';
+        updateFreeLimitNote();
+        openCheckout('single', 'clean');
+        showToast('info', 'This file needs a plan', friendlyError(error));
+      } else {
+        showToast('error', 'Could not clean that file', friendlyError(error));
+      }
     } finally {
       endBusy();
     }
@@ -835,7 +880,13 @@
 
   async function downloadClean(format) {
     if (!state.cleaned || state.busy) return;
-    var button = format === 'json' ? dom.downloadJson : dom.downloadCsv;
+    var buttons = {
+      csv: dom.downloadCsv,
+      json: dom.downloadJson,
+      ndjson: dom.downloadNdjson,
+      tsv: dom.downloadTsv,
+    };
+    var button = buttons[format] || dom.downloadCsv;
     var previousMarkup = button.innerHTML;
     var failureStatus = 0;
     button.disabled = true;
@@ -856,7 +907,10 @@
         }
         if (response.status === 402 && payload && payload.billing) {
           applyBilling(payload.billing);
+          state.paywallReason =
+            payload.access && payload.access.reason ? payload.access.reason : 'EXPORT';
           updatePaywall();
+          openCheckout('single', 'download', format);
         }
         throw new Error(
           (payload && payload.error && payload.error.message) ||
@@ -875,6 +929,9 @@
       setTimeout(function () {
         URL.revokeObjectURL(url);
       }, 2000);
+
+      state.paywallReason = null;
+      updatePaywall();
 
       showToast(
         'success',
@@ -916,6 +973,23 @@
     return Number(state.billing.highVolumeRowLimit) || 0;
   }
 
+  function freeTier() {
+    return state.billing.freeTier || DEFAULT_BILLING.freeTier;
+  }
+
+  function freeRowLimit() {
+    return Number(freeTier().maxRows) || 0;
+  }
+
+  function freeSizeLimit() {
+    return Number(freeTier().maxFileSizeBytes) || DEFAULT_BILLING.freeTier.maxFileSizeBytes;
+  }
+
+  function fileExceedsFreeTier(file) {
+    if (!file) return false;
+    return Number(file.rowCount) > freeRowLimit() || Number(file.size) > freeSizeLimit();
+  }
+
   function hasExportAccess(entitlement) {
     if (!entitlement || !entitlement.active) return false;
     if (entitlement.plan === 'monthly') return true;
@@ -924,6 +998,39 @@
 
   function isHighVolume() {
     return Boolean(state.cleaned && Number(state.cleaned.rowCount) > currentLimit());
+  }
+
+  function updateFreeLimitNote() {
+    if (!dom.freeLimitNote) return;
+
+    var premium = hasExportAccess(state.billing.entitlement);
+    if (!state.file || state.cleaned || premium || !fileExceedsFreeTier(state.file)) {
+      setHidden(dom.freeLimitNote, true, 'flex');
+      return;
+    }
+
+    var single = state.billing.prices.single.display || '$5';
+    var limits = freeTier();
+    var reason =
+      Number(state.file.rowCount) > Number(limits.maxRows)
+        ? 'This file has ' +
+          formatNumber(state.file.rowCount) +
+          ' rows and the free plan cleans up to ' +
+          formatNumber(limits.maxRows) +
+          ' rows.'
+        : 'This file is ' +
+          formatBytes(state.file.size) +
+          ' and the free plan cleans files up to ' +
+          formatNumber(limits.maxFileSizeMb) +
+          ' MB.';
+
+    if (dom.freeLimitCopy) {
+      dom.freeLimitCopy.textContent =
+        reason +
+        ' Upgrade for large files, bulk processing, and NDJSON/TSV exports.';
+    }
+    if (dom.freeLimitPrice) dom.freeLimitPrice.textContent = single;
+    setHidden(dom.freeLimitNote, false, 'flex');
   }
 
   function setHidden(element, hidden, displayClass) {
@@ -961,14 +1068,17 @@
     var billing = state.billing;
     var single = billing.prices.single.display || '$5';
     var monthly = billing.prices.monthly.display || '$19';
-    var limit = formatNumber(currentLimit());
+    var limits = freeTier();
 
     if (dom.pricingSinglePrice) dom.pricingSinglePrice.textContent = single;
     if (dom.pricingMonthlyPrice) dom.pricingMonthlyPrice.textContent = monthly;
     if (dom.checkoutSinglePrice) dom.checkoutSinglePrice.textContent = single;
     if (dom.checkoutMonthlyPrice) dom.checkoutMonthlyPrice.textContent = monthly;
     if (dom.paywallPrice) dom.paywallPrice.textContent = single;
-    if (dom.pricingFreeLimit) dom.pricingFreeLimit.textContent = limit;
+    if (dom.pricingFreeLimit) dom.pricingFreeLimit.textContent = formatNumber(limits.maxRows);
+    if (dom.pricingFreeSize) dom.pricingFreeSize.textContent = formatNumber(limits.maxFileSizeMb);
+    if (dom.checkoutFreeRows) dom.checkoutFreeRows.textContent = formatNumber(limits.maxRows);
+    if (dom.checkoutFreeSize) dom.checkoutFreeSize.textContent = formatNumber(limits.maxFileSizeMb);
 
     if (dom.pricingModeText) {
       var note;
@@ -987,16 +1097,23 @@
     }
 
     updateCheckoutSummary();
+    updateFreeLimitNote();
   }
 
   function updatePaywall() {
     if (!dom.paywallNote) return;
 
     var highVolume = isHighVolume();
+    var premiumFormat = state.paywallReason === 'PREMIUM_FORMAT';
     var entitlement = state.billing.entitlement;
-    var canExport = !highVolume || hasExportAccess(entitlement);
+    var canExport = hasExportAccess(entitlement);
+    var requiresPremium =
+      highVolume ||
+      premiumFormat ||
+      state.paywallReason === 'NO_CREDITS' ||
+      state.paywallReason === 'NO_ENTITLEMENT';
 
-    if (!highVolume || canExport) {
+    if (!state.cleaned || !requiresPremium || canExport) {
       setHidden(dom.paywallNote, true, 'flex');
       return;
     }
@@ -1004,17 +1121,36 @@
     var rowCount = formatNumber(state.cleaned.rowCount);
     var limit = formatNumber(currentLimit());
     var single = state.billing.prices.single.display || '$5';
+    var limits = freeTier();
+
+    if (dom.paywallTitle) {
+      dom.paywallTitle.textContent = premiumFormat
+        ? 'This export format is premium.'
+        : 'This export is above the free limit.';
+    }
 
     if (entitlement && entitlement.plan === 'single' && !hasExportAccess(entitlement)) {
       dom.paywallCopy.textContent =
         ' Your export pass has been used. Buy another pass or subscribe for unlimited downloads.';
+    } else if (premiumFormat) {
+      dom.paywallCopy.textContent =
+        ' NDJSON and TSV are premium formats. Buy a pass or subscribe to unlock them along with large files and bulk processing.';
+    } else if (highVolume) {
+      dom.paywallCopy.textContent =
+        ' This file has ' +
+        rowCount +
+        ' rows and the free download limit is ' +
+        limit +
+        '. Buy a pass or subscribe for unlimited downloads.';
     } else {
       dom.paywallCopy.textContent =
         ' This file has ' +
         rowCount +
-        ' rows and the free limit is ' +
-        limit +
-        '. Buy a pass or subscribe for unlimited downloads.';
+        ' rows and the free plan covers up to ' +
+        formatNumber(limits.maxRows) +
+        ' rows and ' +
+        formatNumber(limits.maxFileSizeMb) +
+        ' MB. Buy a pass or subscribe to unlock it.';
     }
 
     if (dom.paywallPrice) dom.paywallPrice.textContent = single;
@@ -1032,7 +1168,8 @@
 
     var message;
     if (entitlement.plan === 'monthly' && hasExportAccess(entitlement)) {
-      message = 'Your monthly plan is active — high-volume exports are unlimited.';
+      message =
+        'Your monthly plan is active — large files, bulk processing, and premium exports are unlimited.';
     } else if (entitlement.plan === 'single' && hasExportAccess(entitlement)) {
       message =
         'You have ' +
@@ -1141,10 +1278,12 @@
     dom.checkoutError.classList.remove('hidden');
   }
 
-  function openCheckout(plan) {
+  function openCheckout(plan, reason, format) {
     if (!dom.checkoutModal) return;
     state.checkoutTrigger = document.activeElement;
     state.checkoutPlan = plan === 'monthly' ? 'monthly' : 'single';
+    state.checkoutReason = reason || null;
+    state.checkoutFormat = format || null;
 
     planRadios().forEach(function (radio) {
       radio.checked = radio.value === state.checkoutPlan;
@@ -1234,6 +1373,10 @@
         single: Object.assign({}, DEFAULT_BILLING.prices.single, prices.single || {}),
         monthly: Object.assign({}, DEFAULT_BILLING.prices.monthly, prices.monthly || {}),
       },
+      freeTier: Object.assign({}, DEFAULT_BILLING.freeTier, incoming.freeTier || {}),
+      premiumExportFormats: Array.isArray(incoming.premiumExportFormats)
+        ? incoming.premiumExportFormats
+        : DEFAULT_BILLING.premiumExportFormats,
       entitlement: incoming.entitlement || null,
     });
     state.billingReady = true;
@@ -1268,6 +1411,8 @@
 
       if (payload.sandbox) {
         if (payload.billing) applyBilling(payload.billing);
+        var sandboxReason = state.checkoutReason;
+        var sandboxFormat = state.checkoutFormat;
         setCheckoutBusy(false);
         closeCheckout();
         updatePaywall();
@@ -1275,16 +1420,23 @@
           'success',
           'Sandbox purchase complete',
           plan === 'monthly'
-            ? 'Unlimited high-volume exports are unlocked on this browser.'
-            : 'One high-volume export credit is ready. Download your cleaned file to use it.',
+            ? 'Unlimited large-file cleaning and premium exports are unlocked on this browser.'
+            : 'One premium export credit is ready. Large files and NDJSON/TSV exports are unlocked.',
         );
+        resumeAfterUnlock(sandboxReason, sandboxFormat);
       } else if (payload.url) {
+        if (state.checkoutReason === 'clean') {
+          rememberPendingAction('clean');
+        } else if (state.checkoutReason === 'download') {
+          rememberPendingAction('download', { format: state.checkoutFormat || 'csv' });
+        }
         persistWorkspace();
         window.location.assign(payload.url);
       } else {
         throw new Error('Stripe did not return a checkout link. Please try again.');
       }
     } catch (error) {
+      clearPendingAction();
       showCheckoutError(friendlyError(error));
       showToast('error', 'Checkout could not start', friendlyError(error));
     } finally {
@@ -1295,6 +1447,74 @@
   /* ------------------------------------------------------------------ */
   /* Workspace persistence                                               */
   /* ------------------------------------------------------------------ */
+
+  function rememberPendingAction(action, extra) {
+    try {
+      sessionStorage.setItem(
+        PENDING_KEY,
+        JSON.stringify(
+          Object.assign({ action: action, at: Date.now() }, extra && typeof extra === 'object' ? extra : {}),
+        ),
+      );
+    } catch (error) {
+      /* Storage is optional. */
+    }
+  }
+
+  function clearPendingAction() {
+    try {
+      sessionStorage.removeItem(PENDING_KEY);
+    } catch (error) {
+      /* Storage is optional. */
+    }
+  }
+
+  function readPendingAction() {
+    var pending = null;
+    try {
+      var raw = sessionStorage.getItem(PENDING_KEY);
+      if (!raw) return null;
+      pending = JSON.parse(raw);
+    } catch (error) {
+      return null;
+    }
+
+    if (
+      !pending ||
+      (pending.action !== 'clean' && pending.action !== 'download') ||
+      !pending.at ||
+      Date.now() - pending.at > 60 * 60 * 1000
+    ) {
+      clearPendingAction();
+      return null;
+    }
+    return pending;
+  }
+
+  function resumeAfterUnlock(reason, format) {
+    if (reason === 'clean' && state.file) {
+      showToast('info', 'Unlocked', 'Cleaning your saved file now…');
+      cleanData();
+    } else if (reason === 'download' && state.cleaned) {
+      downloadClean(format || 'csv');
+    }
+  }
+
+  function resumePendingAction() {
+    var pending = readPendingAction();
+    if (!pending) return;
+    clearPendingAction();
+
+    if (!state.file) return;
+
+    if (pending.action === 'clean') {
+      showToast('info', 'Payment confirmed', 'Large-file cleaning is unlocked. Cleaning your saved file now…');
+      cleanData();
+    } else if (pending.action === 'download' && state.cleaned) {
+      showToast('info', 'Payment confirmed', 'Your premium export is unlocked. Preparing your download now…');
+      downloadClean(pending.format || 'csv');
+    }
+  }
 
   function persistWorkspace() {
     if (!state.file) {
@@ -1402,6 +1622,7 @@
     }
 
     updatePaywall();
+    updateFreeLimitNote();
     return true;
   }
 
@@ -1437,19 +1658,19 @@
         showToast(
           'success',
           'Your monthly plan is active',
-          'High-volume exports are now unlimited. Head back to your results and download.',
+          'Large files, bulk processing, and premium exports are now unlimited.',
         );
       } else if (entitlement) {
         showToast(
           'success',
           'Your export pass is ready',
-          'One high-volume download is unlocked. Head back to your results and download.',
+          'Large files and NDJSON/TSV exports are unlocked for 24 hours.',
         );
       } else {
         showToast(
           'success',
           'Payment received',
-          'Your purchase was confirmed. Download your cleaned file to use it.',
+          'Your purchase was confirmed. Head back to your file to continue.',
         );
       }
     } else if (notice.type === 'cancelled') {
@@ -1476,7 +1697,13 @@
 
     if (dom.unlockBtn) {
       dom.unlockBtn.addEventListener('click', function () {
-        openCheckout('single');
+        openCheckout('single', 'export');
+      });
+    }
+
+    if (dom.freeLimitUpgrade) {
+      dom.freeLimitUpgrade.addEventListener('click', function () {
+        openCheckout('single', 'clean');
       });
     }
 
@@ -1511,7 +1738,15 @@
 
     refreshBilling({ silent: true }).then(function () {
       updatePaywall();
+      updateFreeLimitNote();
+
+      if (notice && notice.type === 'success' && readPendingAction()) {
+        resumePendingAction();
+        return;
+      }
+
       if (notice) showCheckoutNotice(notice);
+      if (notice && notice.type !== 'success') clearPendingAction();
     });
   }
 
@@ -1542,6 +1777,16 @@
     dom.downloadJson.addEventListener('click', function () {
       downloadClean('json');
     });
+    if (dom.downloadNdjson) {
+      dom.downloadNdjson.addEventListener('click', function () {
+        downloadClean('ndjson');
+      });
+    }
+    if (dom.downloadTsv) {
+      dom.downloadTsv.addEventListener('click', function () {
+        downloadClean('tsv');
+      });
+    }
 
     dom.tabOriginal.addEventListener('click', function () {
       setPreviewTab('original');

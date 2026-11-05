@@ -33,6 +33,14 @@ services:
         value: ""
       - key: ENABLE_BILLING_SANDBOX
         value: "false"
+      - key: FREE_TIER_MAX_ROWS
+        value: "500"
+      - key: FREE_TIER_MAX_FILE_MB
+        value: "1"
+      - key: PREMIUM_EXPORT_FORMATS
+        value: "ndjson,tsv"
+      - key: BULK_MAX_FILES
+        value: "10"
       - key: HIGH_VOLUME_ROW_LIMIT
         value: "5000"
       - key: MAX_FILE_SIZE_MB

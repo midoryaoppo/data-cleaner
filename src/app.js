@@ -96,7 +96,7 @@ const checkoutLimiter = rateLimit({
 });
 
 app.post(
-  '/api/billing/webhook',
+  ['/api/webhook', '/api/billing/webhook'],
   express.raw({ type: 'application/json', limit: '1mb' }),
   asyncHandler(billingController.webhook),
 );

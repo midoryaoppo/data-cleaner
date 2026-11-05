@@ -1,18 +1,21 @@
 # TidyData — Data Cleaner & Converter
 
-TidyData is a full-stack CSV/JSON cleaner built with Node.js, Express, and Tailwind CSS. Upload a messy file, clean it up, preview every change, and download production-ready CSV or JSON. High-volume downloads are gated behind Stripe Checkout with a built-in sandbox mode for testing.
+TidyData is a full-stack CSV/JSON cleaner built with Node.js, Express, and Tailwind CSS. Upload a messy file, clean it up, preview every change, and download production-ready CSV or JSON. A hands-off freemium flow lets anyone clean small files for free while Stripe Checkout unlocks large datasets, bulk cleaning, and premium export formats immediately after payment.
 
 ## Features
 
 - **Upload CSV, TSV, JSON, or NDJSON** up to 10 MB by default.
 - **Clean automatically**: remove duplicate rows, drop empty rows/columns, trim whitespace, normalize headers, fix null/empty cells, and normalize numbers, booleans, and dates.
 - **Live before/after preview** of the first 50 rows, with full statistics for the whole file.
-- **Convert formats**: export the cleaned dataset as CSV or JSON.
+- **Convert formats**: export CSV or JSON for free; NDJSON and TSV are premium formats.
 - **Spreadsheet-friendly CSV**: UTF-8 BOM and CRLF line endings for Excel compatibility.
 - **Private by default**: files are parsed in memory and expire after 30 minutes. Nothing is written to disk.
-- **Stripe Checkout**: $5 one-time export pass, or $19/month for unlimited high-volume exports.
+- **Freemium limits**: free users can preview any supported file, clean files up to `FREE_TIER_MAX_ROWS` / `FREE_TIER_MAX_FILE_MB`, and download CSV/JSON. Large files, bulk jobs, and premium formats require a pass.
+- **Stripe Checkout**: $5 one-time pass or $19/month for unlimited large-file cleaning, bulk processing, and premium exports.
+- **Automatic webhook access**: `POST /api/webhook` verifies Stripe signatures, grants the entitlement immediately, and the success redirect sets a signed browser cookie. If the webhook arrives first, the redirect reuses that entitlement instead of calling Stripe again.
+- **Autonomous upgrade flow**: a blocked large file remains in memory; after payment the browser restores the saved workspace and automatically retries the clean.
 - **Sandbox mode**: complete the whole purchase flow without a real card or charge.
-- **Server-enforced download gating**: a high-volume export cannot be downloaded without a valid entitlement.
+- **Server-enforced gating**: clean, download, format, and bulk endpoints all enforce entitlements independently of the UI.
 - **Production-ready deployment**: Render/Railway manifests, proxy-aware CORS, and a detailed `/health` endpoint for uptime and readiness monitoring.
 - **Responsive UI** with dark mode, keyboard-accessible dialogs, toasts, and inline errors.
 
@@ -48,17 +51,29 @@ npm run dev
 
 | Plan | Price | What you get |
 | --- | --- | --- |
-| Free | $0 | Clean unlimited files and download up to `HIGH_VOLUME_ROW_LIMIT` rows (5,000 by default) |
-| Export pass | $5 one-time | One high-volume export download, valid for 24 hours |
-| Monthly | $19/month | Unlimited high-volume exports while the subscription is active |
+| Free | $0 | Preview any supported file; clean/download up to `FREE_TIER_MAX_ROWS` rows and `FREE_TIER_MAX_FILE_MB` per file; CSV/JSON exports |
+| Export pass | $5 one-time | One premium export credit, 24 hours of large-file access, bulk processing, NDJSON/TSV exports |
+| Monthly | $19/month | Unlimited large-file cleaning, bulk processing, and premium exports while the subscription is active |
 
 How gating works:
 
-- Files at or below the free row limit can always be downloaded.
-- Cleaned files above the limit return HTTP `402 Payment Required` until the browser has an active entitlement cookie.
-- A single pass consumes one credit per successful download.
-- A monthly entitlement is unlimited and does not consume credits.
-- The threshold is configured with `HIGH_VOLUME_ROW_LIMIT`.
+- Free users may upload and preview files up to the global `MAX_FILE_SIZE_MB` limit.
+- `POST /api/clean` returns HTTP `402 Payment Required` when the file exceeds `FREE_TIER_MAX_ROWS` or `FREE_TIER_MAX_FILE_MB`.
+- The uploaded source file stays in memory after a `402`, so the browser can retry the same file after checkout without re-uploading.
+- `POST /api/clean/bulk` requires an active premium entitlement and accepts up to `BULK_MAX_FILES` source files.
+- CSV and JSON are free export formats. `PREMIUM_EXPORT_FORMATS` defaults to `ndjson,tsv`; those formats return `402` without an active entitlement.
+- `HIGH_VOLUME_ROW_LIMIT` is a second, export-side guard: downloads above that row count require an entitlement even if the file was cleaned earlier.
+- A single pass consumes one credit on the first premium/high-volume download. A monthly entitlement is unlimited and does not consume credits.
+- A `402` response includes `billing`, `access`, and `error.details` so a client can render a contextual paywall.
+
+### Autonomous upgrade flow
+
+1. User uploads a large file. Upload succeeds so the preview is visible.
+2. Clicking **Clean data** returns `402` with the free-tier limits and opens checkout.
+3. The workspace (source file id, options, and cleaned file if present) is saved in `sessionStorage`.
+4. Stripe Checkout completes. `POST /api/webhook` verifies the signature and records the entitlement immediately.
+5. Stripe redirects to `/api/billing/success?session_id=...`. The server reuses the webhook entitlement when present, otherwise verifies the session with Stripe, then sets the signed `td_export_pass` cookie.
+6. The browser returns to `/`, restores the saved workspace, verifies billing, and automatically retries the clean. The user can download immediately.
 
 ### Sandbox checkout (default in development)
 
@@ -67,7 +82,7 @@ No Stripe keys are required to try the payment UI:
 - Sandbox mode is enabled by default outside production.
 - Open the checkout modal from the Pricing section, the paywall, or the `Unlock` button.
 - Leave **Sandbox mode** switched on and click **Complete sandbox purchase**.
-- The server immediately issues a signed entitlement cookie. No real money moves.
+- The server immediately issues a signed entitlement cookie, and the client resumes the pending clean or download.
 - Sandbox checkout can be disabled server-side with `ENABLE_BILLING_SANDBOX=false`; the client cannot enable it when it is disabled.
 
 ### Real Stripe Checkout
@@ -90,17 +105,20 @@ No Stripe keys are required to try the payment UI:
    STRIPE_PRICE_MONTHLY_ID=price_...
    ```
 
-5. For subscription renewals and cancellations, forward webhooks to the app:
+5. Forward webhooks to the public endpoint:
 
    ```powershell
-   stripe listen --forward-to localhost:3000/api/billing/webhook
+   stripe listen --forward-to localhost:3000/api/webhook
    ```
 
    Copy the printed signing secret into `STRIPE_WEBHOOK_SECRET`.
 
+   The legacy alias `/api/billing/webhook` also works.
+
 Supported webhook events:
 
 - `checkout.session.completed` — grants access if the success redirect was missed.
+- `checkout.session.async_payment_succeeded` — grants access for delayed payment methods.
 - `invoice.paid` — extends a monthly entitlement.
 - `customer.subscription.deleted` — revokes a cancelled subscription's entitlement.
 
@@ -182,14 +200,16 @@ All API responses are JSON unless noted. Billing, upload, and health endpoints s
 | `GET` | `/health` | Process, memory, uptime, and store-readiness health check (`200`/`503`) |
 | `GET` | `/api/health` | Alias of `/health` for clients that only call the API prefix |
 | `GET` | `/api/sample` | Download the bundled messy CSV sample |
-| `POST` | `/api/upload` | Upload a file as multipart field `file`; returns preview and `file.id` |
-| `POST` | `/api/clean` | Body `{ "fileId": "...", "options": { ... } }`; returns cleaned preview, stats, and `cleaned.id` |
-| `GET` | `/api/download/:id?format=csv\|json` | Download a cleaned file. Returns `402` when payment is required |
+| `POST` | `/api/upload` | Upload a file as multipart field `file`; returns preview, `file.id`, and free-tier `access` |
+| `POST` | `/api/clean` | Body `{ "fileId": "...", "options": { ... } }`; returns cleaned preview, stats, and `cleaned.id`; `402` above free limits |
+| `POST` | `/api/clean/bulk` | Premium only. Body `{ "fileIds": ["...", "..."], "options": { ... } }`; cleans up to `BULK_MAX_FILES` files |
+| `GET` | `/api/download/:id?format=csv\|json\|ndjson\|tsv` | Download a cleaned file. Returns `402` for premium formats or high-volume exports without an entitlement |
 | `DELETE` | `/api/files/:id` | Delete a stored file early |
-| `GET` | `/api/billing/status` | Billing configuration, prices, row limit, and current entitlement |
+| `GET` | `/api/billing/status` | Billing configuration, prices, free-tier limits, premium formats, and current entitlement |
 | `POST` | `/api/billing/checkout` | Body `{ "plan": "single\|monthly", "sandbox": true\|false }` |
-| `GET` | `/api/billing/success` | Stripe success redirect target; verifies the session and sets the entitlement cookie |
-| `POST` | `/api/billing/webhook` | Stripe webhook receiver (raw body, signature verified) |
+| `GET` | `/api/billing/success` | Stripe success redirect target; reuses the webhook entitlement or verifies the session, then sets the cookie |
+| `POST` | `/api/webhook` | Public Stripe webhook receiver (raw body, signature verified) |
+| `POST` | `/api/billing/webhook` | Legacy alias of `/api/webhook` |
 
 Example: upload and clean with PowerShell
 
@@ -208,13 +228,22 @@ A `402` response includes the billing state so a client can render the paywall:
 {
   "error": {
     "code": "PAYMENT_REQUIRED",
-    "message": "This export has 5,005 rows. Free downloads cover up to 5,000 rows — buy an export pass for $5 or subscribe for $19/month."
+    "message": "This file has 12,000 rows. The free plan cleans up to 500 rows and 1 MB per file. Upgrade to clean large files, run bulk jobs, and unlock NDJSON/TSV exports.",
+    "details": {
+      "reason": "FREE_ROW_LIMIT",
+      "fileId": "…",
+      "rowCount": 12000,
+      "limits": { "maxRows": 500, "maxFileSizeMb": 1 }
+    }
   },
   "billing": {
     "highVolumeRowLimit": 5000,
+    "freeTier": { "maxRows": 500, "maxFileSizeMb": 1 },
+    "premiumExportFormats": ["ndjson", "tsv"],
     "prices": { "single": { "display": "$5" }, "monthly": { "display": "$19" } },
     "entitlement": null
-  }
+  },
+  "access": { "allowed": false, "premium": false, "reason": "FREE_ROW_LIMIT" }
 }
 ```
 
@@ -240,7 +269,7 @@ data-cleaner/
 │  ├─ services/
 │  │  ├─ parser.js               # CSV/TSV/JSON/NDJSON parsing
 │  │  ├─ cleaner.js              # Cleaning engine
-│  │  ├─ exporter.js             # CSV/JSON serialization
+│  │  ├─ exporter.js             # CSV/JSON/NDJSON/TSV serialization
 │  │  ├─ fileStore.js            # Expiring in-memory file storage
 │  │  ├─ billing.js              # Stripe, entitlement cookies, access checks
 │  │  └─ billingStore.js         # In-memory entitlement ledger
@@ -257,6 +286,8 @@ data-cleaner/
 └─ test/
    ├─ api.test.js
    ├─ billing.test.js
+   ├─ freemium.test.js
+   ├─ webhook.test.js
    ├─ cleaner.test.js
    └─ parser.test.js
 ```
@@ -267,7 +298,7 @@ data-cleaner/
 npm test
 ```
 
-The suite covers parsing, cleaning, exports, request validation, health/memory/store reporting, CORS allowlisting, billing status, paywall enforcement, single-pass credit consumption, monthly unlimited access, and server-side sandbox refusal. Tests use Node's built-in test runner and an ephemeral port.
+The suite covers parsing, cleaning, exports, request validation, health/memory/store reporting, CORS allowlisting, free-tier row and file-size limits, premium format gating, bulk processing, billing status, single-pass credit consumption, monthly unlimited access, sandbox refusal, public webhook signature verification, event deduplication, and immediate post-payment access. Tests use Node's built-in test runner and an ephemeral port.
 
 ## Configuration reference
 
@@ -279,10 +310,14 @@ The suite covers parsing, cleaning, exports, request validation, health/memory/s
 | `APP_URL` | platform URL or `http://HOST:PORT` | Public base URL for Stripe redirects; its origin is always CORS-allowed |
 | `CORS_ORIGIN` | empty | Extra comma-separated allowed origins for `/api` |
 | `TRUST_PROXY` | `false` (`true` in production) | Trust one reverse-proxy hop so client IP/protocol are correct |
-| `MAX_FILE_SIZE_MB` | `10` | Upload size limit |
+| `MAX_FILE_SIZE_MB` | `10` | Global upload size limit (free files can still be previewed above the free limit) |
 | `MAX_ROWS` | `200000` | Maximum parsed rows |
 | `MAX_COLUMNS` | `200` | Maximum parsed columns |
 | `FILE_TTL_MINUTES` | `30` | In-memory file lifetime |
+| `FREE_TIER_MAX_ROWS` | `500` | Maximum rows a free user can clean/download |
+| `FREE_TIER_MAX_FILE_MB` | `1` | Maximum source file size a free user can clean/download |
+| `PREMIUM_EXPORT_FORMATS` | `ndjson,tsv` | Comma-separated premium formats; use `none` to disable format gating |
+| `BULK_MAX_FILES` | `10` | Maximum files per premium bulk clean request |
 | `STRIPE_SECRET_KEY` | empty | Enables real Stripe Checkout |
 | `STRIPE_WEBHOOK_SECRET` | empty | Verifies webhook signatures |
 | `STRIPE_PRICE_SINGLE_ID` | empty | Optional one-time Stripe Price ID |
@@ -292,7 +327,7 @@ The suite covers parsing, cleaning, exports, request validation, health/memory/s
 | `MONTHLY_PRICE_CENTS` | `1900` | Monthly price |
 | `ENABLE_BILLING_SANDBOX` | `true` outside production | Allows simulated purchases |
 | `BILLING_SECRET` | random per process | Signs entitlement cookies; set this in production |
-| `HIGH_VOLUME_ROW_LIMIT` | `5000` | Rows above this require entitlement |
+| `HIGH_VOLUME_ROW_LIMIT` | `5000` | Export-side guard: rows above this require entitlement |
 | `SINGLE_EXPORT_PASS_HOURS` | `24` | One-time pass lifetime |
 | `SUBSCRIPTION_ACCESS_DAYS` | `31` | Monthly access lifetime before renewal webhook |
 
@@ -302,7 +337,7 @@ The suite covers parsing, cleaning, exports, request validation, health/memory/s
 - **Checkout redirects fail** — `APP_URL` must match the URL you are actually using. For real Stripe, HTTPS is required outside localhost.
 - **Browser CORS error** — add the request origin to `CORS_ORIGIN` (scheme + host + port). The `APP_URL` origin is allowed automatically.
 - **Platform health check fails** — confirm `HOST=0.0.0.0`, the platform-injected `PORT` is used, and `GET /health` returns `200` locally.
-- **Payment succeeded but access is missing** — wait for the success redirect or configure `STRIPE_WEBHOOK_SECRET` and forward `checkout.session.completed`.
+- **Payment succeeded but access is missing** — confirm Stripe is posting `checkout.session.completed` (or `checkout.session.async_payment_succeeded`) to `https://yourdomain.com/api/webhook`, and that `STRIPE_WEBHOOK_SECRET` matches the endpoint. The success redirect also verifies the session directly, so check `/api/billing/success?session_id=...` in the Stripe dashboard if the webhook was missed.
 - **Files or purchases disappear after restart** — expected with the default in-memory stores. Configure `BILLING_SECRET` for cookie continuity and replace the stores for durable data.
 - **Port already in use** — change `PORT` in `.env` or stop the process using port 3000.
 - **Styles look stale after edits** — run `npm run build:css` (or use `npm run dev`).

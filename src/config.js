@@ -40,11 +40,28 @@ function parseOrigins(value, defaultProtocol = 'https') {
     .filter(Boolean);
 }
 
+const EXPORT_FORMATS = ['csv', 'json', 'ndjson', 'tsv'];
+
+function parseExportFormats(value) {
+  const raw = String(value ?? '').trim();
+  if (raw.toLowerCase() === 'none') return [];
+  const source = raw || 'ndjson,tsv';
+  return Array.from(
+    new Set(
+      source
+        .split(',')
+        .map((format) => format.trim().toLowerCase())
+        .filter((format) => EXPORT_FORMATS.includes(format)),
+    ),
+  );
+}
+
 const port = intFromEnv('PORT', 3000, { min: 1, max: 65535 });
 const env = process.env.NODE_ENV || 'development';
 const isProduction = env === 'production';
 const host = process.env.HOST || (isProduction ? '0.0.0.0' : '127.0.0.1');
 const maxFileSizeMb = intFromEnv('MAX_FILE_SIZE_MB', 10, { min: 1, max: 100 });
+const freeTierMaxFileSizeMb = intFromEnv('FREE_TIER_MAX_FILE_MB', 1, { min: 1, max: 100 });
 const displayHost = host === '0.0.0.0' || host === '::' ? 'localhost' : host;
 
 // APP_URL wins. Render and Railway provide their public host automatically so
@@ -85,6 +102,11 @@ const config = {
     sandboxEnabled: boolFromEnv('ENABLE_BILLING_SANDBOX', !isProduction),
     secret: process.env.BILLING_SECRET || crypto.randomBytes(32).toString('hex'),
     highVolumeRowLimit: intFromEnv('HIGH_VOLUME_ROW_LIMIT', 5000, { min: 0 }),
+    freeTierMaxRows: intFromEnv('FREE_TIER_MAX_ROWS', 500, { min: 0 }),
+    freeTierMaxFileSizeMb,
+    freeTierMaxFileSizeBytes: freeTierMaxFileSizeMb * 1024 * 1024,
+    premiumExportFormats: parseExportFormats(process.env.PREMIUM_EXPORT_FORMATS),
+    bulkMaxFiles: intFromEnv('BULK_MAX_FILES', 10, { min: 2, max: 50 }),
     currency: (process.env.STRIPE_CURRENCY || 'usd').toLowerCase(),
     singlePriceCents: intFromEnv('SINGLE_EXPORT_PRICE_CENTS', 500, { min: 1 }),
     monthlyPriceCents: intFromEnv('MONTHLY_PRICE_CENTS', 1900, { min: 1 }),

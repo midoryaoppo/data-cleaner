@@ -13,6 +13,7 @@ router.get('/health', healthController.health);
 router.get('/sample', dataController.sample);
 router.post('/upload', uploader.single('file'), dataController.upload);
 router.post('/clean', dataController.clean);
+router.post('/clean/bulk', dataController.bulkClean);
 router.get('/download/:id', dataController.download);
 router.delete('/files/:id', dataController.remove);
 

@@ -26,6 +26,25 @@ function datasetToJSON(dataset) {
   return Buffer.from(`${JSON.stringify(rows, null, 2)}\n`, 'utf8');
 }
 
+function datasetToNDJSON(dataset) {
+  const lines = dataset.rows.map((row) =>
+    JSON.stringify(
+      Object.fromEntries(dataset.headers.map((header, index) => [header, row[index] ?? null])),
+    ),
+  );
+  return Buffer.from(`${lines.join('\n')}\n`, 'utf8');
+}
+
+function datasetToTSV(dataset) {
+  const records = [dataset.headers, ...dataset.rows.map((row) => row.map(serializeCell))];
+  const tsv = stringify(records, {
+    delimiter: '\t',
+    record_delimiter: '\r\n',
+    quoted_empty: false,
+  });
+  return Buffer.from(`\uFEFF${tsv}`, 'utf8');
+}
+
 function baseFilename(originalName) {
   const withoutExtension = path
     .basename(String(originalName || 'data'))
@@ -40,7 +59,8 @@ function baseFilename(originalName) {
 }
 
 function buildDownloadFilename(originalName, format) {
-  return `${baseFilename(originalName)}-cleaned.${format === 'json' ? 'json' : 'csv'}`;
+  const extension = ['csv', 'json', 'ndjson', 'tsv'].includes(format) ? format : 'csv';
+  return `${baseFilename(originalName)}-cleaned.${extension}`;
 }
 
 function contentDisposition(filename) {
@@ -55,6 +75,20 @@ function buildExport(dataset, format) {
       extension: 'json',
     };
   }
+  if (format === 'ndjson') {
+    return {
+      buffer: datasetToNDJSON(dataset),
+      contentType: 'application/x-ndjson; charset=utf-8',
+      extension: 'ndjson',
+    };
+  }
+  if (format === 'tsv') {
+    return {
+      buffer: datasetToTSV(dataset),
+      contentType: 'text/tab-separated-values; charset=utf-8',
+      extension: 'tsv',
+    };
+  }
   return {
     buffer: datasetToCSV(dataset),
     contentType: 'text/csv; charset=utf-8',
@@ -65,6 +99,8 @@ function buildExport(dataset, format) {
 module.exports = {
   datasetToCSV,
   datasetToJSON,
+  datasetToNDJSON,
+  datasetToTSV,
   buildDownloadFilename,
   contentDisposition,
   buildExport,

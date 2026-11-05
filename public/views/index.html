@@ -561,6 +561,27 @@
                   </svg>
                 </button>
               </div>
+
+              <div
+                id="free-limit-note"
+                class="mt-3 hidden flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/70 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-amber-400/20 dark:bg-amber-400/[0.06]"
+              >
+                <div class="flex items-start gap-2.5">
+                  <svg class="mt-0.5 h-4 w-4 flex-none text-amber-600 dark:text-amber-300" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <use href="#i-lock" />
+                  </svg>
+                  <p class="text-xs leading-5 text-amber-900 dark:text-amber-200">
+                    <span class="font-semibold">This file is above the free plan.</span>
+                    <span id="free-limit-copy"> Upgrade to clean large files, run bulk jobs, and unlock premium exports.</span>
+                  </p>
+                </div>
+                <button id="free-limit-upgrade" type="button" class="btn btn-secondary flex-none border-amber-200 bg-white/80 px-3 py-2 text-xs text-amber-900 hover:bg-white dark:border-amber-400/20 dark:bg-white/5 dark:text-amber-200 dark:hover:bg-white/10">
+                  <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                    <use href="#i-sparkles" />
+                  </svg>
+                  Upgrade for <span id="free-limit-price">$5</span>
+                </button>
+              </div>
             </section>
           </div>
         </div>
@@ -596,12 +617,26 @@
                 </p>
               </div>
             </div>
-            <div class="flex flex-col-reverse gap-2 sm:flex-row">
+            <div class="flex flex-col-reverse flex-wrap gap-2 sm:flex-row">
               <button id="download-json" type="button" class="btn btn-secondary">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                   <use href="#i-code" />
                 </svg>
                 JSON
+              </button>
+              <button id="download-ndjson" type="button" class="btn btn-secondary">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-code" />
+                </svg>
+                NDJSON
+                <span class="badge badge-brand !px-1.5 !py-0.5 text-[9px]">Pro</span>
+              </button>
+              <button id="download-tsv" type="button" class="btn btn-secondary">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
+                  <use href="#i-table" />
+                </svg>
+                TSV
+                <span class="badge badge-brand !px-1.5 !py-0.5 text-[9px]">Pro</span>
               </button>
               <button id="download-csv" type="button" class="btn btn-primary">
                 <svg class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
@@ -621,7 +656,7 @@
                 <use href="#i-lock" />
               </svg>
               <p class="text-xs leading-5 text-amber-800 dark:text-amber-200">
-                <span class="font-semibold">This export is above the free limit.</span>
+                <span id="paywall-title" class="font-semibold">This export is above the free limit.</span>
                 <span id="paywall-copy"> Buy a single export pass or subscribe for unlimited downloads.</span>
               </p>
             </div>
@@ -835,8 +870,8 @@
             Free for small files. Pay only when you scale.
           </h2>
           <p class="mt-3 text-sm leading-6 text-slate-500 dark:text-slate-400">
-            Clean, preview, and export everyday files for free. When a download crosses the free row limit, grab a
-            one-time pass or subscribe for unlimited exports.
+            Clean and preview any supported file for free. Upgrade when you need large files, bulk processing, or
+            premium export formats.
           </p>
           <p
             id="pricing-mode-note"
@@ -858,7 +893,7 @@
               <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ forever</span>
             </p>
             <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              For quick cleanups, small exports, and getting a feel for TidyData.
+              For quick cleanups and everyday exports without a card.
             </p>
             <a href="#workspace" class="btn btn-secondary mt-5 w-full">
               Start cleaning
@@ -869,15 +904,15 @@
             <ul class="mt-6 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                Free downloads up to <span id="pricing-free-limit" class="font-semibold">5,000</span> rows
+                Free cleaning and downloads up to <span id="pricing-free-limit" class="font-semibold">500</span> rows or <span id="pricing-free-size" class="font-semibold">1</span> MB
               </li>
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                Every cleaning option and live preview
+                Preview files of any supported size
               </li>
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                CSV and JSON conversion
+                Every cleaning option and CSV/JSON conversion
               </li>
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
@@ -893,10 +928,10 @@
             </div>
             <p class="mt-4 flex items-baseline gap-1">
               <span id="pricing-single-price" class="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">$5</span>
-              <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ one export</span>
+              <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ 24 hours</span>
             </p>
             <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-              One large file, one clean download. No subscription and no account required.
+              One large file, one premium download. No subscription and no account required.
             </p>
             <button type="button" data-checkout-plan="single" class="btn btn-secondary mt-5 w-full">
               Buy export pass
@@ -907,19 +942,19 @@
             <ul class="mt-6 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                One high-volume CSV or JSON download
+                One premium export credit (any supported format)
               </li>
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                Pass stays valid for 24 hours
+                Large-file cleaning for 24 hours
+              </li>
+              <li class="flex items-start gap-2">
+                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
+                NDJSON/TSV exports and bulk processing
               </li>
               <li class="flex items-start gap-2">
                 <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
                 Secure Stripe Checkout
-              </li>
-              <li class="flex items-start gap-2">
-                <svg class="mt-0.5 h-4 w-4 flex-none text-brand-600 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                Works with any file size we support
               </li>
             </ul>
           </div>
@@ -936,7 +971,7 @@
                 <span class="text-xs font-medium text-slate-400 dark:text-slate-500">/ month</span>
               </p>
               <p class="mt-2 text-sm leading-6 text-slate-500 dark:text-slate-400">
-                For regular data work and teams that export large files often.
+                For regular data work and teams that clean large files often.
               </p>
               <button type="button" data-checkout-plan="monthly" class="btn btn-primary mt-5 w-full">
                 Subscribe monthly
@@ -947,11 +982,11 @@
               <ul class="mt-6 space-y-2.5 text-sm text-slate-600 dark:text-slate-300">
                 <li class="flex items-start gap-2">
                   <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                  Unlimited high-volume exports
+                  Unlimited large-file cleaning and exports
                 </li>
                 <li class="flex items-start gap-2">
                   <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
-                  Every cleaning option and format
+                  Bulk processing and every premium export format
                 </li>
                 <li class="flex items-start gap-2">
                   <svg class="mt-0.5 h-4 w-4 flex-none text-brand-700 dark:text-brand-400" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><use href="#i-check" /></svg>
@@ -967,8 +1002,8 @@
         </div>
 
         <p class="mt-5 text-center text-[11px] leading-5 text-slate-400 dark:text-slate-500">
-          Prices in USD. High-volume exports are downloads above the free row limit. Sandbox checkout lets you try the
-          full flow without a real charge.
+          Prices in USD. Free cleaning covers small files; large files, bulk jobs, and NDJSON/TSV exports need a pass
+          or subscription. Sandbox checkout lets you try the full flow without a real charge.
         </p>
       </section>
 
@@ -1063,10 +1098,12 @@
             <div>
               <p class="group-label text-brand-600 dark:text-brand-400">Checkout</p>
               <h2 id="checkout-title" class="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
-                Unlock high-volume exports
+                Unlock large files & premium exports
               </h2>
               <p id="checkout-description" class="mt-1 text-xs leading-5 text-slate-500 dark:text-slate-400">
-                Choose a one-time pass or a monthly plan. You'll only pay when you export a large file.
+                Free plan: up to <span id="checkout-free-rows" class="font-semibold">500</span> rows or
+                <span id="checkout-free-size" class="font-semibold">1</span> MB per file. Upgrade for large datasets,
+                bulk processing, and NDJSON/TSV downloads.
               </p>
             </div>
             <button id="checkout-close" type="button" class="icon-btn -mr-1 -mt-1 flex-none" aria-label="Close checkout">
@@ -1101,7 +1138,7 @@
                   <span class="min-w-0 flex-1">
                     <span class="block text-sm font-semibold text-slate-900 dark:text-white">Export pass</span>
                     <span class="mt-0.5 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                      One high-volume download · valid 24 hours
+                      One premium export · large files + NDJSON/TSV · valid 24 hours
                     </span>
                   </span>
                   <span id="checkout-single-price" class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">$5</span>
@@ -1120,7 +1157,7 @@
                       <span class="rounded-full bg-brand-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-brand-700 dark:bg-brand-400/15 dark:text-brand-300">Unlimited</span>
                     </span>
                     <span class="mt-0.5 block text-[11px] leading-5 text-slate-500 dark:text-slate-400">
-                      Unlimited high-volume exports · month-to-month
+                      Unlimited large files, bulk processing, and premium exports · month-to-month
                     </span>
                   </span>
                   <span id="checkout-monthly-price" class="text-sm font-semibold tabular-nums text-slate-900 dark:text-white">$19</span>

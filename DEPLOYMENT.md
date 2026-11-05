@@ -96,6 +96,10 @@ BILLING_SECRET=<generated long random secret>
 STRIPE_SECRET_KEY=sk_live_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 ENABLE_BILLING_SANDBOX=false
+FREE_TIER_MAX_ROWS=500
+FREE_TIER_MAX_FILE_MB=1
+PREMIUM_EXPORT_FORMATS=ndjson,tsv
+BULK_MAX_FILES=10
 ```
 
 Render injects `PORT` automatically. Do not hardcode it.
@@ -181,27 +185,32 @@ Use the final HTTPS domain, not a temporary platform preview URL.
 2. Endpoint URL:
 
    ```text
-   https://yourdomain.com/api/billing/webhook
+   https://yourdomain.com/api/webhook
    ```
+
+   `/api/billing/webhook` remains available as a compatibility alias for older endpoints. Use `/api/webhook` for new deployments.
 
 3. Subscribe to these events:
    - `checkout.session.completed`
+   - `checkout.session.async_payment_succeeded`
    - `invoice.paid`
    - `customer.subscription.deleted`
 4. Copy the **Signing secret** (`whsec_...`).
 5. Add it as `STRIPE_WEBHOOK_SECRET` in Render/Railway.
 6. Redeploy.
 
-The server verifies the raw request body with the signing secret and deduplicates repeated Stripe event IDs. `invoice.paid` extends monthly access; `customer.subscription.deleted` revokes it.
+The server verifies the raw request body with the signing secret and deduplicates repeated Stripe event IDs. `checkout.session.completed` and `checkout.session.async_payment_succeeded` grant access immediately; `invoice.paid` extends monthly access; `customer.subscription.deleted` revokes it.
+
+The `/api/billing/success` redirect also verifies the checkout session directly. If the webhook already created the entitlement, the redirect reuses it without a second Stripe API call, so a temporary Stripe outage cannot leave a paying customer locked out.
 
 ### Local webhook testing
 
 ```powershell
 stripe login
-stripe listen --forward-to localhost:3000/api/billing/webhook
+stripe listen --forward-to localhost:3000/api/webhook
 ```
 
-Use the printed `whsec_...` as `STRIPE_WEBHOOK_SECRET` in your local `.env`.
+Use the printed `whsec_...` as `STRIPE_WEBHOOK_SECRET` in your local `.env`, then complete a test checkout with card `4242 4242 4242 4242`. The Stripe CLI prints each delivered event and the app logs rejected signatures or processing errors.
 
 ## 9. Post-deploy verification
 
@@ -224,19 +233,38 @@ Invoke-RestMethod -Method Post `
 Expected production values:
 
 - `/health` → HTTP 200, `"status": "ok"`, `stores.ready: true`, `stores.database.configured: false`
-- `/api/billing/status` → `billing.stripeMode: "live"`, `billing.stripeConfigured: true`, `billing.sandboxEnabled: false`
+- `/api/billing/status` → `billing.stripeMode: "live"`, `billing.stripeConfigured: true`, `billing.sandboxEnabled: false`, `freeTier.maxRows: 500`, `freeTier.maxFileSizeMb: 1`, `premiumExportFormats: ["ndjson","tsv"]`
 - Checkout response contains a `url` beginning with `https://checkout.stripe.com/`
 
-Then complete an end-to-end purchase:
+### Free-tier and automatic-upgrade flow
 
-1. Upload a CSV with more than 5,000 cleaned rows.
-2. Confirm the paywall appears for the download.
-3. Buy the export pass with a real card (or test card in test mode).
-4. Return to the app and confirm the header shows `1 export credit`.
-5. Download the cleaned CSV successfully.
-6. Confirm the credit is consumed and the paywall returns for another export.
+1. Upload a small CSV (under 500 rows and 1 MB). Confirm it cleans and downloads as CSV or JSON without a payment.
+2. Request an NDJSON or TSV download. Confirm HTTP `402` and that the checkout modal opens with the premium-format reason.
+3. Upload a CSV with more than 500 rows (or a source file over 1 MB). Confirm the upload succeeds and the preview is visible, but the **Upgrade for $5** notice appears and **Clean data** returns `402`.
+4. Buy the export pass with a real card (or test card in test mode).
+5. Confirm Stripe delivers `checkout.session.completed` to `/api/webhook` with a 2xx response.
+6. Return to the app. It restores the saved workspace and automatically retries the clean.
+7. Confirm the header shows `1 export credit`, download the premium format successfully, and confirm the credit is consumed.
+8. Request another premium export and confirm the paywall returns.
 
-Test the monthly plan separately and confirm Stripe sends `invoice.paid` on renewal.
+Test the monthly plan separately:
+
+1. Subscribe with the monthly plan.
+2. Confirm large-file cleaning stays unlocked and premium downloads are unlimited.
+3. Confirm Stripe sends `invoice.paid` on renewal and the entitlement is extended.
+4. Cancel the subscription in Stripe and confirm `customer.subscription.deleted` revokes access.
+
+Test bulk processing with an active entitlement:
+
+```powershell
+Invoke-RestMethod -Method Post `
+  -Uri https://yourdomain.com/api/clean/bulk `
+  -ContentType 'application/json' `
+  -Headers @{ Cookie = 'td_export_pass=<cookie-from-checkout>' } `
+  -Body '{"fileIds":["<id-1>","<id-2>"],"options":{}}'
+```
+
+Without an entitlement the same request must return HTTP `402` with `error.details.reason: "BULK_PREMIUM"`.
 
 ## 10. Store durability and zero-downtime
 
@@ -269,9 +297,11 @@ For a real paid launch, migrate both stores to a shared durable backend (Redis o
 - `STRIPE_WEBHOOK_SECRET` is configured
 - `APP_URL` is the final HTTPS hostname
 - `TRUST_PROXY=true` on Render/Railway
+- `FREE_TIER_MAX_ROWS`, `FREE_TIER_MAX_FILE_MB`, `PREMIUM_EXPORT_FORMATS`, and `BULK_MAX_FILES` match your intended pricing
 - custom domain has valid TLS
 - no `.env` or `.env.production` file is committed
-- Stripe webhook endpoint returns 2xx in the Stripe dashboard
+- Stripe webhook endpoint `/api/webhook` returns 2xx in the Stripe dashboard
+- Stripe webhook subscribes to `checkout.session.completed`, `checkout.session.async_payment_succeeded`, `invoice.paid`, and `customer.subscription.deleted`
 - Stripe account is fully activated before accepting live payments
 
 ## 12. Troubleshooting
@@ -282,8 +312,10 @@ For a real paid launch, migrate both stores to a shared durable backend (Redis o
 | Stripe redirect goes to localhost or wrong host | Set `APP_URL` to the final `https://` domain and redeploy |
 | Browser CORS error | Ensure the request Origin is either `APP_URL` or listed in `CORS_ORIGIN` |
 | `Checkout unavailable` | Set `STRIPE_SECRET_KEY`; sandbox is intentionally disabled in production |
-| Webhook returns 400 | Check `STRIPE_WEBHOOK_SECRET` and that the endpoint receives the raw body |
-| Payment works but access is missing | Confirm the success URL is reachable and inspect webhook delivery in Stripe |
+| Webhook returns 400 | Check `STRIPE_WEBHOOK_SECRET` and that `/api/webhook` receives the raw body (not JSON-parsed) |
+| Webhook returns 404 | Point Stripe at `https://yourdomain.com/api/webhook`; `/api/billing/webhook` is only a compatibility alias |
+| Payment works but access is missing | Confirm `/api/webhook` delivery in Stripe and that `/api/billing/success?session_id=...` is reachable; the redirect reuses a webhook-created entitlement |
+| Large file uploads but cannot be cleaned | Expected on the free tier; confirm the checkout modal opens and that the saved workspace auto-retries after payment |
 | Files/purchases vanish after deploy | Expected with in-memory stores; migrate to Redis/Postgres |
 | Duplicate webhook delivery | Already handled by event-ID deduplication; verify the event ID is present |
 

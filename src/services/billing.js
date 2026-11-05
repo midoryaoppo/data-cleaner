@@ -7,6 +7,7 @@ const { AppError } = require('../errors');
 const { billingStore } = require('./billingStore');
 
 const COOKIE_NAME = 'td_export_pass';
+const SUPPORTED_EXPORT_FORMATS = ['csv', 'json', 'ndjson', 'tsv'];
 
 let stripe = null;
 if (config.billing.stripeSecretKey) {
@@ -137,6 +138,106 @@ function getRequestEntitlement(req) {
   return entitlement;
 }
 
+function hasPremiumAccess(entitlement) {
+  if (!entitlement) return false;
+  if (entitlement.plan === 'monthly') return true;
+  return entitlement.plan === 'single' && entitlement.remainingExports > 0;
+}
+
+function freeTierLimits() {
+  return {
+    maxRows: config.billing.freeTierMaxRows,
+    maxFileSizeBytes: config.billing.freeTierMaxFileSizeBytes,
+    maxFileSizeMb: config.billing.freeTierMaxFileSizeMb,
+  };
+}
+
+function normalizeExportFormat(format) {
+  const normalized = String(format || 'csv').trim().toLowerCase();
+  return SUPPORTED_EXPORT_FORMATS.includes(normalized) ? normalized : null;
+}
+
+function toPublicAccess(access) {
+  if (!access) return null;
+  return {
+    allowed: Boolean(access.allowed),
+    premium: Boolean(access.premium),
+    reason: access.reason || null,
+    limits: access.limits || freeTierLimits(),
+  };
+}
+
+function evaluateDatasetAccess(req, { rowCount = 0, size = 0 } = {}) {
+  const entitlement = getRequestEntitlement(req);
+  const limits = freeTierLimits();
+
+  if (hasPremiumAccess(entitlement)) {
+    return { allowed: true, premium: true, entitlement, reason: null, limits };
+  }
+
+  let reason = null;
+  if (rowCount > limits.maxRows) reason = 'FREE_ROW_LIMIT';
+  else if (size > limits.maxFileSizeBytes) reason = 'FREE_FILE_SIZE_LIMIT';
+
+  return {
+    allowed: reason === null,
+    premium: false,
+    entitlement: entitlement || null,
+    reason,
+    limits,
+  };
+}
+
+function evaluateExportAccess(req, rowCount, format = 'csv') {
+  const normalizedFormat = normalizeExportFormat(format) || 'csv';
+  const highVolume = rowCount > config.billing.highVolumeRowLimit;
+  const premiumFormat = config.billing.premiumExportFormats.includes(normalizedFormat);
+  const entitlement = getRequestEntitlement(req);
+  const premium = hasPremiumAccess(entitlement);
+
+  if (premiumFormat && !premium) {
+    return {
+      allowed: false,
+      highVolume,
+      premiumFormat,
+      entitlement,
+      reason: entitlement ? 'NO_CREDITS' : 'PREMIUM_FORMAT',
+      format: normalizedFormat,
+    };
+  }
+
+  if (!highVolume) {
+    return {
+      allowed: true,
+      highVolume: false,
+      premiumFormat,
+      entitlement,
+      billable: Boolean(premium && premiumFormat && entitlement.plan === 'single'),
+      format: normalizedFormat,
+    };
+  }
+
+  if (!premium) {
+    return {
+      allowed: false,
+      highVolume: true,
+      premiumFormat,
+      entitlement,
+      reason: entitlement ? 'NO_CREDITS' : 'NO_ENTITLEMENT',
+      format: normalizedFormat,
+    };
+  }
+
+  return {
+    allowed: true,
+    highVolume: true,
+    premiumFormat,
+    entitlement,
+    billable: entitlement.plan === 'single',
+    format: normalizedFormat,
+  };
+}
+
 function toPublicEntitlement(entitlement) {
   if (!entitlement) return null;
   const active =
@@ -157,20 +258,24 @@ function getStatus(req) {
     stripeConfigured: Boolean(stripe),
     stripeMode: stripeMode(),
     highVolumeRowLimit: config.billing.highVolumeRowLimit,
+    freeTier: freeTierLimits(),
+    premiumExportFormats: config.billing.premiumExportFormats.slice(),
+    bulkMaxFiles: config.billing.bulkMaxFiles,
     prices: {
       single: {
         amountCents: config.billing.singlePriceCents,
         display: formatPrice(config.billing.singlePriceCents),
-        label: 'one high-volume export',
+        label: 'one premium export',
       },
       monthly: {
         amountCents: config.billing.monthlyPriceCents,
         display: formatPrice(config.billing.monthlyPriceCents),
-        label: 'unlimited exports',
+        label: 'unlimited premium exports',
         interval: 'month',
       },
     },
     entitlement: toPublicEntitlement(entitlement),
+    premium: hasPremiumAccess(entitlement),
   };
 }
 
@@ -204,8 +309,8 @@ async function createStripeCheckout(plan) {
     product_data: {
       name: isSubscription ? 'TidyData Pro — monthly' : 'TidyData export pass',
       description: isSubscription
-        ? 'Unlimited high-volume CSV and JSON exports while subscribed.'
-        : 'One high-volume CSV or JSON export download.',
+        ? 'Unlimited large-file cleaning, bulk processing, and premium exports while subscribed.'
+        : 'One premium export: large-file cleaning, bulk processing, and NDJSON/TSV downloads for 24 hours.',
     },
     ...(isSubscription ? { recurring: { interval: 'month' } } : {}),
   };
@@ -266,13 +371,20 @@ async function checkout(plan, { sandbox = false } = {}) {
 }
 
 async function completeStripeCheckout(sessionId) {
+  if (!sessionId || typeof sessionId !== 'string') {
+    throw new AppError(400, 'Missing Stripe checkout session.', { code: 'MISSING_SESSION' });
+  }
+
+  // The webhook may have already granted access. Reuse that entitlement so a
+  // temporary Stripe API failure cannot block the browser from getting its
+  // signed cookie after a successful payment.
+  const existing = billingStore.getBySession(sessionId);
+  if (existing) return existing;
+
   if (!stripe) {
     throw new AppError(503, 'Stripe is not configured on this server.', {
       code: 'STRIPE_NOT_CONFIGURED',
     });
-  }
-  if (!sessionId || typeof sessionId !== 'string') {
-    throw new AppError(400, 'Missing Stripe checkout session.', { code: 'MISSING_SESSION' });
   }
 
   let session;
@@ -291,8 +403,8 @@ async function completeStripeCheckout(sessionId) {
     });
   }
 
-  const existing = billingStore.getBySession(session.id);
-  if (existing) return existing;
+  const alreadyGranted = billingStore.getBySession(session.id);
+  if (alreadyGranted) return alreadyGranted;
 
   const plan = session.metadata && session.metadata.plan === 'monthly' ? 'monthly' : 'single';
   if (plan === 'single' && session.payment_status !== 'paid') {
@@ -344,16 +456,25 @@ function handleWebhook(event) {
     billingStore.markEventProcessed(event.id);
   }
 
-  if (event.type === 'checkout.session.completed') {
+  if (
+    event.type === 'checkout.session.completed' ||
+    event.type === 'checkout.session.async_payment_succeeded'
+  ) {
     const session = event.data.object;
     if (session && session.id) {
       const plan = session.metadata && session.metadata.plan === 'monthly' ? 'monthly' : 'single';
-      billingStore.create({
-        plan,
-        sessionId: session.id,
-        subscriptionId: subscriptionIdFrom(session.subscription),
-        sandbox: false,
-      });
+      const paid =
+        session.payment_status === 'paid' ||
+        session.payment_status === 'no_payment_required' ||
+        session.mode === 'subscription';
+      if (paid) {
+        billingStore.create({
+          plan,
+          sessionId: session.id,
+          subscriptionId: subscriptionIdFrom(session.subscription),
+          sandbox: false,
+        });
+      }
     }
   } else if (event.type === 'invoice.paid') {
     const invoice = event.data.object;
@@ -367,37 +488,6 @@ function handleWebhook(event) {
   }
 }
 
-function evaluateExportAccess(req, rowCount) {
-  const highVolume = rowCount > config.billing.highVolumeRowLimit;
-  const entitlement = getRequestEntitlement(req);
-
-  if (!highVolume) {
-    return { allowed: true, highVolume: false, entitlement, billable: false };
-  }
-  if (!entitlement) {
-    return {
-      allowed: false,
-      highVolume: true,
-      entitlement: null,
-      reason: 'NO_ENTITLEMENT',
-    };
-  }
-  if (entitlement.plan === 'single' && entitlement.remainingExports < 1) {
-    return {
-      allowed: false,
-      highVolume: true,
-      entitlement,
-      reason: 'NO_CREDITS',
-    };
-  }
-  return {
-    allowed: true,
-    highVolume: true,
-    entitlement,
-    billable: entitlement.plan === 'single',
-  };
-}
-
 function consumeExport(entitlement) {
   if (entitlement && entitlement.plan === 'single') {
     billingStore.consumeExport(entitlement.id);
@@ -406,15 +496,21 @@ function consumeExport(entitlement) {
 
 module.exports = {
   COOKIE_NAME,
+  SUPPORTED_EXPORT_FORMATS,
   checkout,
   clearEntitlementCookie,
   completeStripeCheckout,
   consumeExport,
+  evaluateDatasetAccess,
   evaluateExportAccess,
+  freeTierLimits,
   getRequestEntitlement,
   getStatus,
   handleWebhook,
+  hasPremiumAccess,
+  normalizeExportFormat,
   setEntitlementCookie,
+  toPublicAccess,
   toPublicEntitlement,
   verifyWebhook,
 };
