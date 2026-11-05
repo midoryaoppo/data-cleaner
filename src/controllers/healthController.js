@@ -2,6 +2,7 @@
 
 const pkg = require('../../package.json');
 const config = require('../config');
+const database = require('../db/database');
 const { fileStore } = require('../services/fileStore');
 const { billingStore } = require('../services/billingStore');
 
@@ -26,10 +27,16 @@ function formatUptime(totalSeconds) {
   return parts.join(' ');
 }
 
-function health(req, res) {
-  const fileStoreHealth = fileStore.health();
-  const billingStoreHealth = billingStore.health();
-  const storesReady = Boolean(fileStoreHealth.ready && billingStoreHealth.ready);
+async function health(req, res) {
+  const [fileStoreHealth, billingStoreHealth, databaseHealth] = await Promise.all([
+    fileStore.health(),
+    billingStore.health(),
+    database.health(),
+  ]);
+  const databaseReady = databaseHealth.ready === null ? true : databaseHealth.ready;
+  const storesReady = Boolean(
+    fileStoreHealth.ready && billingStoreHealth.ready && databaseReady,
+  );
   const usage = process.memoryUsage();
   const uptimeSeconds = Math.round(process.uptime());
 
@@ -58,17 +65,10 @@ function health(req, res) {
     },
     stores: {
       ready: storesReady,
-      persistence: 'in-memory',
+      persistence: config.database.enabled ? 'postgres' : 'in-memory',
       fileStore: fileStoreHealth,
       billingStore: billingStoreHealth,
-      database: {
-        configured: false,
-        required: false,
-        ready: null,
-        status: 'not_configured',
-        driver: 'none',
-        message: 'No external database is configured; expiring in-memory stores are in use.',
-      },
+      database: databaseHealth,
     },
   };
 

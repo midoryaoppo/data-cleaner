@@ -1,6 +1,7 @@
 'use strict';
 
 process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = '';
 process.env.ENABLE_BILLING_SANDBOX = 'true';
 process.env.BILLING_SECRET = 'test-billing-secret';
 process.env.FREE_TIER_MAX_ROWS = '10';
@@ -28,8 +29,8 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
-  fileStore.close();
-  billingStore.clear();
+  await fileStore.close();
+  await billingStore.clear();
 });
 
 function csvWithRows(count, label = 'row') {

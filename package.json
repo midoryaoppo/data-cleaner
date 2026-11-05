@@ -12,6 +12,7 @@
     "dev": "concurrently -k -n server,css -c cyan,magenta \"node --watch server.js\" \"npm:watch:css\"",
     "build": "npm run build:css",
     "build:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/css/styles.css --minify",
+    "db:migrate": "node scripts/migrate.js",
     "watch:css": "tailwindcss -i ./src/styles/tailwind.css -o ./public/css/styles.css --watch",
     "test": "node --test",
     "test:watch": "node --test --watch"
@@ -38,9 +39,11 @@
     "helmet": "^8.3.0",
     "json2csv": "^6.0.0-alpha.2",
     "multer": "^2.5.0",
+    "pg": "^8.23.1",
     "stripe": "^23.1.0"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.3.14",
     "concurrently": "^10.0.6",
     "tailwindcss": "^3.4.17"
   }

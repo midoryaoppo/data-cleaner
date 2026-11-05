@@ -1,6 +1,7 @@
 'use strict';
 
 process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = '';
 process.env.ENABLE_BILLING_SANDBOX = 'true';
 process.env.BILLING_SECRET = 'test-billing-secret';
 process.env.HIGH_VOLUME_ROW_LIMIT = '2';
@@ -29,8 +30,8 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
-  fileStore.close();
-  billingStore.clear();
+  await fileStore.close();
+  await billingStore.clear();
 });
 
 function cookieHeader(response) {
@@ -186,8 +187,8 @@ test('rejects invalid plans and cannot be forced into sandbox when disabled', as
   }
 });
 
-test('webhook renewals, deduplication, and cancellations use the subscription ledger', () => {
-  const entitlement = billingStore.create({
+test('webhook renewals, deduplication, and cancellations use the subscription ledger', async () => {
+  const entitlement = await billingStore.create({
     plan: 'monthly',
     subscriptionId: 'sub_nested_invoice_test',
   });
@@ -207,19 +208,55 @@ test('webhook renewals, deduplication, and cancellations use the subscription le
     },
   };
 
-  billing.handleWebhook(renewal);
-  const renewed = billingStore.get(entitlement.id);
+  await billing.handleWebhook(renewal);
+  const renewed = await billingStore.get(entitlement.id);
   assert.ok(renewed.expiresAt > originalExpiry);
   const expiryAfterFirstDelivery = renewed.expiresAt;
 
   // Stripe can deliver the same event more than once; do not extend twice.
-  billing.handleWebhook(renewal);
-  assert.equal(billingStore.get(entitlement.id).expiresAt, expiryAfterFirstDelivery);
+  await billing.handleWebhook(renewal);
+  assert.equal((await billingStore.get(entitlement.id)).expiresAt, expiryAfterFirstDelivery);
 
-  billing.handleWebhook({
+  await billing.handleWebhook({
     id: 'evt_test_cancellation',
     type: 'customer.subscription.deleted',
     data: { object: { id: 'sub_nested_invoice_test' } },
   });
-  assert.equal(billingStore.get(entitlement.id), null);
+  assert.equal(await billingStore.get(entitlement.id), null);
+});
+
+test('releases a failed webhook claim so Stripe can retry the event', async () => {
+  const event = {
+    id: 'evt_test_retry_after_failure',
+    type: 'checkout.session.completed',
+    data: {
+      object: {
+        id: 'cs_test_retry_after_failure',
+        mode: 'payment',
+        payment_status: 'paid',
+        metadata: { plan: 'single' },
+      },
+    },
+  };
+
+  const originalCreate = billingStore.create;
+  let attempts = 0;
+  billingStore.create = async function createWithFailure(...args) {
+    attempts += 1;
+    if (attempts === 1) throw new Error('simulated webhook processing failure');
+    return originalCreate.apply(this, args);
+  };
+
+  try {
+    await assert.rejects(billing.handleWebhook(event), /simulated webhook processing failure/);
+    assert.equal(await billingStore.hasProcessedEvent(event.id), false);
+    assert.equal(await billingStore.getBySession(event.data.object.id), null);
+
+    await billing.handleWebhook(event);
+    assert.equal(attempts, 2);
+    assert.equal(await billingStore.hasProcessedEvent(event.id), true);
+    assert.ok(await billingStore.getBySession(event.data.object.id));
+  } finally {
+    billingStore.create = originalCreate;
+  }
 });

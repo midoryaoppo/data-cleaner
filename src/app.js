@@ -120,7 +120,7 @@ app.use('/api', (req, res) => {
   });
 });
 
-app.get('/health', healthController.health);
+app.get('/health', asyncHandler(healthController.health));
 
 app.get('/', (req, res) => {
   res.sendFile(viewFile);

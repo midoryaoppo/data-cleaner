@@ -1,6 +1,7 @@
 'use strict';
 
 process.env.NODE_ENV = 'test';
+process.env.DATABASE_URL = '';
 process.env.BILLING_SECRET = 'test-billing-secret';
 process.env.STRIPE_SECRET_KEY = 'sk_test_webhook';
 process.env.STRIPE_WEBHOOK_SECRET = 'whsec_test_webhook_secret';
@@ -28,8 +29,8 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
-  fileStore.close();
-  billingStore.clear();
+  await fileStore.close();
+  await billingStore.clear();
 });
 
 function signatureFor(payload) {
@@ -65,7 +66,7 @@ test('the public /api/webhook verifies signatures and grants access immediately'
   assert.equal(response.status, 200);
   assert.deepEqual(await response.json(), { received: true });
 
-  const entitlement = billingStore.getBySession('cs_test_webhook_single');
+  const entitlement = await billingStore.getBySession('cs_test_webhook_single');
   assert.ok(entitlement);
   assert.equal(entitlement.plan, 'single');
   assert.equal(entitlement.remainingExports, 1);
@@ -91,7 +92,7 @@ test('deduplicates repeated event IDs and supports the legacy webhook alias', as
   };
   const payload = JSON.stringify(event);
   assert.equal((await postWebhook('/api/webhook', payload)).status, 200);
-  assert.ok(billingStore.getBySession('cs_test_webhook_duplicate_a'));
+  assert.ok(await billingStore.getBySession('cs_test_webhook_duplicate_a'));
 
   const duplicateWithNewSession = JSON.stringify({
     ...event,
@@ -103,7 +104,7 @@ test('deduplicates repeated event IDs and supports the legacy webhook alias', as
     },
   });
   assert.equal((await postWebhook('/api/webhook', duplicateWithNewSession)).status, 200);
-  assert.equal(billingStore.getBySession('cs_test_webhook_duplicate_b'), null);
+  assert.equal(await billingStore.getBySession('cs_test_webhook_duplicate_b'), null);
 
   const monthly = {
     id: 'evt_checkout_monthly_alias_test',
@@ -122,7 +123,7 @@ test('deduplicates repeated event IDs and supports the legacy webhook alias', as
   const aliasResponse = await postWebhook('/api/billing/webhook', aliasPayload);
   assert.equal(aliasResponse.status, 200);
 
-  const entitlement = billingStore.getBySession('cs_test_webhook_monthly');
+  const entitlement = await billingStore.getBySession('cs_test_webhook_monthly');
   assert.ok(entitlement);
   assert.equal(entitlement.plan, 'monthly');
   assert.equal(entitlement.subscriptionId, 'sub_test_webhook_monthly');

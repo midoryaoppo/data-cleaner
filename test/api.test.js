@@ -1,5 +1,7 @@
 'use strict';
 
+process.env.DATABASE_URL = '';
+
 const fs = require('node:fs');
 const path = require('node:path');
 const { test, before, after } = require('node:test');
@@ -21,7 +23,7 @@ before(async () => {
 
 after(async () => {
   await new Promise((resolve) => server.close(resolve));
-  fileStore.close();
+  await fileStore.close();
 });
 
 async function uploadSample() {
@@ -86,7 +88,7 @@ test('reports memory, uptime, and store readiness from both health routes', asyn
 
 test('returns 503 and degraded status when a store is unavailable', async () => {
   const originalHealth = billingStore.health;
-  billingStore.health = () => ({ ready: false, driver: 'memory' });
+  billingStore.health = async () => ({ ready: false, driver: 'memory' });
 
   try {
     const response = await fetch(`${baseUrl}/health`);

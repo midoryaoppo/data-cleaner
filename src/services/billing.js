@@ -48,6 +48,20 @@ function invoiceSubscriptionId(invoice) {
   );
 }
 
+function checkoutCustomer(session) {
+  if (!session || typeof session !== 'object') {
+    return { stripeCustomerId: null, customerEmail: null };
+  }
+  const details = session.customer_details;
+  return {
+    stripeCustomerId: subscriptionIdFrom(session.customer),
+    customerEmail:
+      (details && typeof details.email === 'string' && details.email) ||
+      (typeof session.customer_email === 'string' && session.customer_email) ||
+      null,
+  };
+}
+
 function formatPrice(cents) {
   try {
     return new Intl.NumberFormat('en-US', {
@@ -129,11 +143,11 @@ function clearEntitlementCookie(res) {
   });
 }
 
-function getRequestEntitlement(req) {
+async function getRequestEntitlement(req) {
   const cookieValue = req.cookies ? req.cookies[COOKIE_NAME] : null;
   const payload = verifyToken(cookieValue);
   if (!payload) return null;
-  const entitlement = billingStore.get(payload.eid);
+  const entitlement = await billingStore.get(payload.eid);
   if (!entitlement || entitlement.plan !== payload.plan) return null;
   return entitlement;
 }
@@ -167,8 +181,8 @@ function toPublicAccess(access) {
   };
 }
 
-function evaluateDatasetAccess(req, { rowCount = 0, size = 0 } = {}) {
-  const entitlement = getRequestEntitlement(req);
+async function evaluateDatasetAccess(req, { rowCount = 0, size = 0 } = {}) {
+  const entitlement = await getRequestEntitlement(req);
   const limits = freeTierLimits();
 
   if (hasPremiumAccess(entitlement)) {
@@ -188,11 +202,11 @@ function evaluateDatasetAccess(req, { rowCount = 0, size = 0 } = {}) {
   };
 }
 
-function evaluateExportAccess(req, rowCount, format = 'csv') {
+async function evaluateExportAccess(req, rowCount, format = 'csv') {
   const normalizedFormat = normalizeExportFormat(format) || 'csv';
   const highVolume = rowCount > config.billing.highVolumeRowLimit;
   const premiumFormat = config.billing.premiumExportFormats.includes(normalizedFormat);
-  const entitlement = getRequestEntitlement(req);
+  const entitlement = await getRequestEntitlement(req);
   const premium = hasPremiumAccess(entitlement);
 
   if (premiumFormat && !premium) {
@@ -251,8 +265,8 @@ function toPublicEntitlement(entitlement) {
   };
 }
 
-function getStatus(req) {
-  const entitlement = getRequestEntitlement(req);
+async function getStatus(req) {
+  const entitlement = await getRequestEntitlement(req);
   return {
     sandboxEnabled: config.billing.sandboxEnabled,
     stripeConfigured: Boolean(stripe),
@@ -344,7 +358,7 @@ async function createStripeCheckout(plan) {
   }
 }
 
-function startSandboxCheckout(plan) {
+async function startSandboxCheckout(plan) {
   if (!config.billing.sandboxEnabled) {
     throw new AppError(
       403,
@@ -363,7 +377,7 @@ function startSandboxCheckout(plan) {
 async function checkout(plan, { sandbox = false } = {}) {
   assertPlan(plan);
   if (sandbox) {
-    return { sandbox: true, entitlement: startSandboxCheckout(plan), url: null };
+    return { sandbox: true, entitlement: await startSandboxCheckout(plan), url: null };
   }
 
   const session = await createStripeCheckout(plan);
@@ -378,7 +392,7 @@ async function completeStripeCheckout(sessionId) {
   // The webhook may have already granted access. Reuse that entitlement so a
   // temporary Stripe API failure cannot block the browser from getting its
   // signed cookie after a successful payment.
-  const existing = billingStore.getBySession(sessionId);
+  const existing = await billingStore.getBySession(sessionId);
   if (existing) return existing;
 
   if (!stripe) {
@@ -403,7 +417,7 @@ async function completeStripeCheckout(sessionId) {
     });
   }
 
-  const alreadyGranted = billingStore.getBySession(session.id);
+  const alreadyGranted = await billingStore.getBySession(session.id);
   if (alreadyGranted) return alreadyGranted;
 
   const plan = session.metadata && session.metadata.plan === 'monthly' ? 'monthly' : 'single';
@@ -423,6 +437,7 @@ async function completeStripeCheckout(sessionId) {
     sessionId: session.id,
     subscriptionId: subscriptionIdFrom(session.subscription),
     sandbox: false,
+    ...checkoutCustomer(session),
   });
 }
 
@@ -448,14 +463,32 @@ function verifyWebhook(rawBody, signature) {
   }
 }
 
-function handleWebhook(event) {
+async function handleWebhook(event) {
   if (!event || typeof event !== 'object') return;
 
+  let claimed = false;
   if (typeof event.id === 'string' && event.id) {
-    if (billingStore.hasProcessedEvent(event.id)) return;
-    billingStore.markEventProcessed(event.id);
+    claimed = await billingStore.claimEvent(event.id);
+    if (!claimed) return;
   }
 
+  try {
+    await processWebhookEvent(event);
+  } catch (error) {
+    // Release the claim so Stripe can retry an event that failed partway
+    // through instead of treating it as permanently processed.
+    if (claimed) {
+      try {
+        await billingStore.releaseEvent(event.id);
+      } catch (releaseError) {
+        console.error('[tidydata] Could not release webhook event:', releaseError.message);
+      }
+    }
+    throw error;
+  }
+}
+
+async function processWebhookEvent(event) {
   if (
     event.type === 'checkout.session.completed' ||
     event.type === 'checkout.session.async_payment_succeeded'
@@ -468,29 +501,30 @@ function handleWebhook(event) {
         session.payment_status === 'no_payment_required' ||
         session.mode === 'subscription';
       if (paid) {
-        billingStore.create({
+        await billingStore.create({
           plan,
           sessionId: session.id,
           subscriptionId: subscriptionIdFrom(session.subscription),
           sandbox: false,
+          ...checkoutCustomer(session),
         });
       }
     }
   } else if (event.type === 'invoice.paid') {
     const invoice = event.data.object;
     const subscriptionId = invoiceSubscriptionId(invoice);
-    if (subscriptionId) billingStore.extendSubscription(subscriptionId);
+    if (subscriptionId) await billingStore.extendSubscription(subscriptionId);
   } else if (event.type === 'customer.subscription.deleted') {
     const subscription = event.data.object;
     if (subscription && subscription.id) {
-      billingStore.revokeBySubscription(subscription.id);
+      await billingStore.revokeBySubscription(subscription.id);
     }
   }
 }
 
-function consumeExport(entitlement) {
+async function consumeExport(entitlement) {
   if (entitlement && entitlement.plan === 'single') {
-    billingStore.consumeExport(entitlement.id);
+    await billingStore.consumeExport(entitlement.id);
   }
 }
 

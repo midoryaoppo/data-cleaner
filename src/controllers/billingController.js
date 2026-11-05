@@ -2,10 +2,10 @@
 
 const billing = require('../services/billing');
 
-function status(req, res) {
-  const entitlement = billing.getRequestEntitlement(req);
+async function status(req, res) {
+  const entitlement = await billing.getRequestEntitlement(req);
   if (entitlement) billing.setEntitlementCookie(res, entitlement);
-  res.json({ billing: billing.getStatus(req) });
+  res.json({ billing: await billing.getStatus(req) });
 }
 
 async function checkout(req, res) {
@@ -17,10 +17,11 @@ async function checkout(req, res) {
 
   if (result.sandbox) {
     billing.setEntitlementCookie(res, result.entitlement);
+    const status = await billing.getStatus(req);
     res.status(201).json({
       sandbox: true,
       entitlement: billing.toPublicEntitlement(result.entitlement),
-      billing: { ...billing.getStatus(req), entitlement: billing.toPublicEntitlement(result.entitlement) },
+      billing: { ...status, entitlement: billing.toPublicEntitlement(result.entitlement) },
     });
     return;
   }
@@ -45,9 +46,9 @@ async function success(req, res) {
   }
 }
 
-function webhook(req, res) {
+async function webhook(req, res) {
   const event = billing.verifyWebhook(req.body, req.headers['stripe-signature']);
-  billing.handleWebhook(event);
+  await billing.handleWebhook(event);
   res.json({ received: true });
 }
 

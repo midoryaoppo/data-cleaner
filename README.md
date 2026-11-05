@@ -9,11 +9,12 @@ TidyData is a full-stack CSV/JSON cleaner built with Node.js, Express, and Tailw
 - **Live before/after preview** of the first 50 rows, with full statistics for the whole file.
 - **Convert formats**: export CSV or JSON for free; NDJSON and TSV are premium formats.
 - **Spreadsheet-friendly CSV**: UTF-8 BOM and CRLF line endings for Excel compatibility.
-- **Private by default**: files are parsed in memory and expire after 30 minutes. Nothing is written to disk.
+- **Durable by default**: with `DATABASE_URL` set, entitlements, webhook event IDs, and uploaded/cleaned datasets are stored in PostgreSQL and survive restarts and redeploys. Files still expire after `FILE_TTL_MINUTES`.
+- **Automatic migrations**: SQL migrations run on startup (and via `npm run db:migrate`) with a PostgreSQL advisory lock for safe concurrent deploys.
 - **Freemium limits**: free users can preview any supported file, clean files up to `FREE_TIER_MAX_ROWS` / `FREE_TIER_MAX_FILE_MB`, and download CSV/JSON. Large files, bulk jobs, and premium formats require a pass.
 - **Stripe Checkout**: $5 one-time pass or $19/month for unlimited large-file cleaning, bulk processing, and premium exports.
 - **Automatic webhook access**: `POST /api/webhook` verifies Stripe signatures, grants the entitlement immediately, and the success redirect sets a signed browser cookie. If the webhook arrives first, the redirect reuses that entitlement instead of calling Stripe again.
-- **Autonomous upgrade flow**: a blocked large file remains in memory; after payment the browser restores the saved workspace and automatically retries the clean.
+- **Autonomous upgrade flow**: a blocked large file remains available in the file store; after payment the browser restores the saved workspace and automatically retries the clean.
 - **Sandbox mode**: complete the whole purchase flow without a real card or charge.
 - **Server-enforced gating**: clean, download, format, and bulk endpoints all enforce entitlements independently of the UI.
 - **Production-ready deployment**: Render/Railway manifests, proxy-aware CORS, and a detailed `/health` endpoint for uptime and readiness monitoring.
@@ -24,6 +25,7 @@ TidyData is a full-stack CSV/JSON cleaner built with Node.js, Express, and Tailw
 - Node.js **20 or newer**
 - npm 9 or newer
 - A modern browser
+- PostgreSQL **13 or newer** for durable production storage (optional for local development)
 
 ## Quick start
 
@@ -37,7 +39,19 @@ npm run build:css
 npm start
 ```
 
-Then open <http://127.0.0.1:3000>.
+Then open <http://127.0.0.1:3000>. With `DATABASE_URL` empty, local development uses the in-memory stores and resets on restart.
+
+To develop against PostgreSQL, create a database, set `DATABASE_URL`, and start the app; migrations run automatically:
+
+```dotenv
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:5432/tidydata
+AUTO_MIGRATE=true
+```
+
+```powershell
+npm run db:migrate   # optional manual migration run
+npm start
+```
 
 For development with automatic server restarts and Tailwind rebuilds:
 
@@ -46,6 +60,23 @@ npm run dev
 ```
 
 `npm run dev` runs the server with `node --watch` and Tailwind in watch mode. The prebuilt CSS is already included, so `npm run build:css` is only needed after editing HTML/JS classes or `src/styles/tailwind.css`.
+
+## Data persistence
+
+TidyData selects its store implementation at startup:
+
+- `DATABASE_URL` set â€” PostgreSQL stores entitlements, Stripe webhook deduplication state, and uploaded/cleaned datasets.
+- `DATABASE_URL` empty â€” in-memory stores are used for tests and local development. `NODE_ENV=production` refuses to start without a database.
+
+PostgreSQL schema (`db/migrations/001_initial.sql`):
+
+- `entitlements` â€” plan, active/revoked status, export credits, session ID, Stripe customer/subscription IDs, customer email, sandbox flag, expiry, and revoked timestamp.
+- `processed_webhook_events` â€” Stripe event IDs claimed atomically so retries are not processed twice.
+- `files` â€” file kind/source relationship, name, format, size, gzipped dataset payload (`bytea`), creation time, and expiry.
+
+Uploaded files are still temporary: expired rows are purged every 60 seconds and every read requires `expires_at > now()`. Billing entitlements persist until their configured access window ends or Stripe sends a cancellation webhook.
+
+Migrations are tracked in `schema_migrations` and wrapped in a transaction under a PostgreSQL advisory lock, so multiple instances can start or deploy concurrently. The server runs them automatically when `AUTO_MIGRATE=true`; `npm run db:migrate` runs the same migration runner manually.
 
 ## Pricing and billing
 
@@ -59,7 +90,7 @@ How gating works:
 
 - Free users may upload and preview files up to the global `MAX_FILE_SIZE_MB` limit.
 - `POST /api/clean` returns HTTP `402 Payment Required` when the file exceeds `FREE_TIER_MAX_ROWS` or `FREE_TIER_MAX_FILE_MB`.
-- The uploaded source file stays in memory after a `402`, so the browser can retry the same file after checkout without re-uploading.
+- The uploaded source file stays in the file store after a `402`, so the browser can retry the same file after checkout without re-uploading.
 - `POST /api/clean/bulk` requires an active premium entitlement and accepts up to `BULK_MAX_FILES` source files.
 - CSV and JSON are free export formats. `PREMIUM_EXPORT_FORMATS` defaults to `ndjson,tsv`; those formats return `402` without an active entitlement.
 - `HIGH_VOLUME_ROW_LIMIT` is a second, export-side guard: downloads above that row count require an entitlement even if the file was cleaned earlier.
@@ -142,8 +173,11 @@ Key production behavior:
 - CORS always allows the `APP_URL` origin. `CORS_ORIGIN` adds a comma-separated list of extra origins; wildcards are not used and credentials are enabled.
 - `TRUST_PROXY=true` should be set on Render/Railway; it trusts exactly one reverse-proxy hop.
 - Sandbox checkout is disabled by default in production. Keep `ENABLE_BILLING_SANDBOX=false` on public deployments.
-- Entitlements and uploaded files are stored **in memory**. A restart clears them, and the app is intended to run as a single instance. For multi-instance or durable billing, replace `src/services/billingStore.js` and `src/services/fileStore.js` with Redis/Postgres-backed implementations. The interfaces are intentionally small.
-- The app does not write uploads to disk; if you add a database, treat data retention as a product decision.
+- `DATABASE_URL` is required in production. `render.yaml` provisions a Render PostgreSQL instance and injects its internal connection string; on Railway, add the PostgreSQL plugin and reference `DATABASE_URL`.
+- Entitlements, webhook deduplication, and uploaded/cleaned datasets are stored in PostgreSQL, so restarts, redeploys, and horizontal scaling no longer clear purchases or active sessions.
+- Uploads are never written to local disk. Datasets are gzipped into the PostgreSQL `files` table and purged after `FILE_TTL_MINUTES`; expired rows are removed by a periodic sweep.
+- Migrations run automatically at startup when `AUTO_MIGRATE=true` (the default). The included Render Blueprint also runs `npm run db:migrate` as a pre-deploy command; both paths use an advisory lock, so concurrent deploys are safe.
+- `DATABASE_SSL=true` enables TLS for external/public database URLs. Internal Render/Railway connections normally stay on the private network.
 
 ### Health and monitoring
 
@@ -160,14 +194,15 @@ Key production behavior:
   },
   "stores": {
     "ready": true,
-    "persistence": "in-memory",
-    "fileStore": { "ready": true, "driver": "memory" },
-    "billingStore": { "ready": true, "driver": "memory" },
+    "persistence": "postgres",
+    "fileStore": { "ready": true, "driver": "postgres" },
+    "billingStore": { "ready": true, "driver": "postgres" },
     "database": {
-      "configured": false,
-      "required": false,
-      "ready": null,
-      "status": "not_configured"
+      "configured": true,
+      "required": true,
+      "ready": true,
+      "status": "ready",
+      "driver": "postgres"
     }
   }
 }
@@ -251,16 +286,25 @@ A `402` response includes the billing state so a client can render the paywall:
 
 ```text
 data-cleaner/
-├─ server.js                     # HTTP server and graceful shutdown
+├─ server.js                     # Startup migrations, HTTP server, graceful shutdown
 ├─ package.json
-├─ render.yaml                   # Render Blueprint (build, health check, env)
+├─ render.yaml                   # Render web service + PostgreSQL blueprint
 ├─ Procfile                      # Web process declaration
 ├─ .env.example                  # Local environment template
 ├─ .env.production.example       # Production environment template
 ├─ DEPLOYMENT.md                 # Deployment, Stripe, and domain guide
+├─ db/
+│  └─ migrations/
+│     └─ 001_initial.sql         # Entitlements, webhook events, and files schema
+├─ scripts/
+│  └─ migrate.js                 # Manual `npm run db:migrate` runner
 ├─ src/
 │  ├─ app.js                     # Express app, CORS, proxy, static views
 │  ├─ config.js                  # Environment parsing and defaults
+│  ├─ db/
+│  │  ├─ database.js             # PostgreSQL pool, transactions, health
+│  │  ├─ migrate.js              # Advisory-locked SQL migration runner
+│  │  └─ initialize.js           # Startup migration and production fail-fast
 │  ├─ routes/api.js              # API router
 │  ├─ controllers/
 │  │  ├─ dataController.js       # Upload, clean, download, delete
@@ -270,9 +314,9 @@ data-cleaner/
 │  │  ├─ parser.js               # CSV/TSV/JSON/NDJSON parsing
 │  │  ├─ cleaner.js              # Cleaning engine
 │  │  ├─ exporter.js             # CSV/JSON/NDJSON/TSV serialization
-│  │  ├─ fileStore.js            # Expiring in-memory file storage
+│  │  ├─ fileStore.js            # Memory/Postgres expiring file storage
 │  │  ├─ billing.js              # Stripe, entitlement cookies, access checks
-│  │  └─ billingStore.js         # In-memory entitlement ledger
+│  │  └─ billingStore.js         # Memory/Postgres entitlement ledger
 │  ├─ middleware/                # Multer upload and error handling
 │  ├─ utils/                     # Async handler, header helpers
 │  ├─ fixtures/sample.csv
@@ -288,6 +332,7 @@ data-cleaner/
    ├─ billing.test.js
    ├─ freemium.test.js
    ├─ webhook.test.js
+   ├─ postgres.test.js
    ├─ cleaner.test.js
    └─ parser.test.js
 ```
@@ -298,7 +343,7 @@ data-cleaner/
 npm test
 ```
 
-The suite covers parsing, cleaning, exports, request validation, health/memory/store reporting, CORS allowlisting, free-tier row and file-size limits, premium format gating, bulk processing, billing status, single-pass credit consumption, monthly unlimited access, sandbox refusal, public webhook signature verification, event deduplication, and immediate post-payment access. Tests use Node's built-in test runner and an ephemeral port.
+The suite covers parsing, cleaning, exports, request validation, health/memory/store reporting, CORS allowlisting, free-tier row and file-size limits, premium format gating, bulk processing, billing status, single-pass credit consumption, monthly unlimited access, sandbox refusal, public webhook signature verification, event deduplication, and immediate post-payment access. Tests use Node's built-in test runner and an ephemeral port. The PostgreSQL adapters are additionally exercised against an embedded PostgreSQL (PGlite) using the real migration: entitlement lifecycle, credits, subscription renewal/revocation, webhook claims, gzipped file round-trips, and TTL expiry.
 
 ## Configuration reference
 
@@ -310,10 +355,14 @@ The suite covers parsing, cleaning, exports, request validation, health/memory/s
 | `APP_URL` | platform URL or `http://HOST:PORT` | Public base URL for Stripe redirects; its origin is always CORS-allowed |
 | `CORS_ORIGIN` | empty | Extra comma-separated allowed origins for `/api` |
 | `TRUST_PROXY` | `false` (`true` in production) | Trust one reverse-proxy hop so client IP/protocol are correct |
+| `DATABASE_URL` | empty | PostgreSQL connection string; required in production for durable entitlements and files |
+| `DATABASE_SSL` | `false` | Enable TLS for external/public PostgreSQL connections |
+| `DATABASE_POOL_MAX` | `10` | Maximum PostgreSQL pool connections per process |
+| `AUTO_MIGRATE` | `true` | Run pending SQL migrations when the server starts |
 | `MAX_FILE_SIZE_MB` | `10` | Global upload size limit (free files can still be previewed above the free limit) |
 | `MAX_ROWS` | `200000` | Maximum parsed rows |
 | `MAX_COLUMNS` | `200` | Maximum parsed columns |
-| `FILE_TTL_MINUTES` | `30` | In-memory file lifetime |
+| `FILE_TTL_MINUTES` | `30` | Stored file lifetime before TTL cleanup |
 | `FREE_TIER_MAX_ROWS` | `500` | Maximum rows a free user can clean/download |
 | `FREE_TIER_MAX_FILE_MB` | `1` | Maximum source file size a free user can clean/download |
 | `PREMIUM_EXPORT_FORMATS` | `ndjson,tsv` | Comma-separated premium formats; use `none` to disable format gating |
@@ -338,7 +387,7 @@ The suite covers parsing, cleaning, exports, request validation, health/memory/s
 - **Browser CORS error** — add the request origin to `CORS_ORIGIN` (scheme + host + port). The `APP_URL` origin is allowed automatically.
 - **Platform health check fails** — confirm `HOST=0.0.0.0`, the platform-injected `PORT` is used, and `GET /health` returns `200` locally.
 - **Payment succeeded but access is missing** — confirm Stripe is posting `checkout.session.completed` (or `checkout.session.async_payment_succeeded`) to `https://yourdomain.com/api/webhook`, and that `STRIPE_WEBHOOK_SECRET` matches the endpoint. The success redirect also verifies the session directly, so check `/api/billing/success?session_id=...` in the Stripe dashboard if the webhook was missed.
-- **Files or purchases disappear after restart** — expected with the default in-memory stores. Configure `BILLING_SECRET` for cookie continuity and replace the stores for durable data.
+- **Files or purchases disappear after restart** — production requires `DATABASE_URL`. If it is missing, the app refuses to start; local development without it intentionally uses memory. Confirm the database service is reachable and `/health` reports `stores.persistence: "postgres"`.
 - **Port already in use** — change `PORT` in `.env` or stop the process using port 3000.
 - **Styles look stale after edits** — run `npm run build:css` (or use `npm run dev`).
 

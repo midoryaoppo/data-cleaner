@@ -81,6 +81,8 @@ const corsOrigins = Array.from(
   ].filter(Boolean)),
 );
 
+const databaseUrl = String(process.env.DATABASE_URL || '').trim();
+
 const config = {
   env,
   isProduction,
@@ -96,6 +98,14 @@ const config = {
   maxStoredFiles: 80,
   trustProxy: boolFromEnv('TRUST_PROXY', isProduction),
   corsOrigins,
+  database: {
+    url: databaseUrl,
+    enabled: Boolean(databaseUrl),
+    required: isProduction,
+    ssl: boolFromEnv('DATABASE_SSL', false),
+    poolMax: intFromEnv('DATABASE_POOL_MAX', 10, { min: 1, max: 50 }),
+    autoMigrate: boolFromEnv('AUTO_MIGRATE', true),
+  },
   billing: {
     stripeSecretKey: (process.env.STRIPE_SECRET_KEY || '').trim(),
     stripeWebhookSecret: (process.env.STRIPE_WEBHOOK_SECRET || '').trim(),

@@ -4,6 +4,7 @@ services:
     runtime: node
     plan: 0.5c-512mb
     buildCommand: npm ci --include=dev && npm run build:css
+    preDeployCommand: npm run db:migrate
     startCommand: npm start
     healthCheckPath: /health
     autoDeployTrigger: commit
@@ -21,6 +22,16 @@ services:
         sync: false
       - key: CORS_ORIGIN
         value: ""
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tidydata-db
+          property: connectionString
+      - key: DATABASE_SSL
+        value: "false"
+      - key: DATABASE_POOL_MAX
+        value: "10"
+      - key: AUTO_MIGRATE
+        value: "true"
       - key: BILLING_SECRET
         generateValue: true
       - key: STRIPE_SECRET_KEY
@@ -45,3 +56,12 @@ services:
         value: "5000"
       - key: MAX_FILE_SIZE_MB
         value: "10"
+
+databases:
+  - name: tidydata-db
+    plan: 0.1c-256mb
+    databaseName: tidydata
+    user: tidydata
+    # Only allow connections from Render's private network. The web service
+    # receives the internal connection string through DATABASE_URL above.
+    ipAllowList: []

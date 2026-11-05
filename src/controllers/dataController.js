@@ -54,24 +54,24 @@ function sample(req, res) {
     .send(sampleCsv);
 }
 
-function upload(req, res) {
+async function upload(req, res) {
   if (!req.file) {
     throw new AppError(400, 'Please choose a file to upload.', { code: 'NO_FILE' });
   }
 
   const dataset = parseDataset(req.file.buffer, req.file.originalname);
-  const access = billing.evaluateDatasetAccess(req, {
+  const access = await billing.evaluateDatasetAccess(req, {
     rowCount: dataset.rows.length,
     size: req.file.size,
   });
-  const id = fileStore.put({
+  const id = await fileStore.put({
     kind: 'source',
     name: req.file.originalname,
     format: dataset.format,
     size: req.file.size,
     dataset: { headers: dataset.headers, rows: dataset.rows },
   });
-  const entry = fileStore.get(id);
+  const entry = await fileStore.get(id);
   const preview = buildPreview(dataset);
 
   res.status(201).json({
@@ -108,9 +108,9 @@ function optionsForEntry(body, entry) {
   return options;
 }
 
-function cleanSourceEntry(entry, options) {
+async function cleanSourceEntry(entry, options) {
   const result = cleanDataset(entry.dataset, options);
-  const cleanedId = fileStore.put({
+  const cleanedId = await fileStore.put({
     kind: 'cleaned',
     sourceId: entry.id,
     name: entry.name,
@@ -118,7 +118,7 @@ function cleanSourceEntry(entry, options) {
     size: entry.size,
     dataset: { headers: result.headers, rows: result.rows },
   });
-  const cleanedEntry = fileStore.get(cleanedId);
+  const cleanedEntry = await fileStore.get(cleanedId);
   const preview = buildPreview({ headers: result.headers, rows: result.rows });
 
   return {
@@ -135,7 +135,7 @@ function cleanSourceEntry(entry, options) {
   };
 }
 
-function clean(req, res) {
+async function clean(req, res) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const { fileId } = body;
 
@@ -145,20 +145,20 @@ function clean(req, res) {
     });
   }
 
-  const entry = fileStore.get(fileId.trim());
+  const entry = await fileStore.get(fileId.trim());
   if (!entry || entry.kind !== 'source') {
     throw new AppError(404, 'That file is no longer available. Please upload it again.', {
       code: 'FILE_NOT_FOUND',
     });
   }
 
-  const access = billing.evaluateDatasetAccess(req, {
+  const access = await billing.evaluateDatasetAccess(req, {
     rowCount: entry.dataset.rows.length,
     size: entry.size,
   });
 
   if (!access.allowed) {
-    const status = billing.getStatus(req);
+    const status = await billing.getStatus(req);
     res.status(402).json({
       error: {
         code: 'PAYMENT_REQUIRED',
@@ -179,10 +179,10 @@ function clean(req, res) {
   }
 
   const options = optionsForEntry(body, entry);
-  res.json({ cleaned: cleanSourceEntry(entry, options) });
+  res.json({ cleaned: await cleanSourceEntry(entry, options) });
 }
 
-function bulkClean(req, res) {
+async function bulkClean(req, res) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const rawIds = body.fileIds;
 
@@ -211,9 +211,9 @@ function bulkClean(req, res) {
     });
   }
 
-  const entitlement = billing.getRequestEntitlement(req);
+  const entitlement = await billing.getRequestEntitlement(req);
   if (!billing.hasPremiumAccess(entitlement)) {
-    const status = billing.getStatus(req);
+    const status = await billing.getStatus(req);
     res.status(402).json({
       error: {
         code: 'PAYMENT_REQUIRED',
@@ -229,25 +229,29 @@ function bulkClean(req, res) {
     return;
   }
 
-  const entries = fileIds.map((fileId) => {
-    const entry = fileStore.get(fileId);
+  const entries = [];
+  for (const fileId of fileIds) {
+    const entry = await fileStore.get(fileId);
     if (!entry || entry.kind !== 'source') {
       throw new AppError(404, 'One of those files is no longer available. Please upload it again.', {
         code: 'FILE_NOT_FOUND',
         details: { fileId },
       });
     }
-    return entry;
-  });
+    entries.push(entry);
+  }
 
   const optionsList = entries.map((entry) => optionsForEntry(body, entry));
-  const cleaned = entries.map((entry, index) => cleanSourceEntry(entry, optionsList[index]));
+  const cleaned = [];
+  for (let index = 0; index < entries.length; index += 1) {
+    cleaned.push(await cleanSourceEntry(entries[index], optionsList[index]));
+  }
 
   res.json({ cleaned, count: cleaned.length });
 }
 
-function download(req, res) {
-  const entry = fileStore.get(req.params.id);
+async function download(req, res) {
+  const entry = await fileStore.get(req.params.id);
   if (!entry || entry.kind !== 'cleaned') {
     throw new AppError(
       404,
@@ -264,9 +268,9 @@ function download(req, res) {
   }
 
   const rowCount = entry.dataset.rows.length;
-  const access = billing.evaluateExportAccess(req, rowCount, requestedFormat);
+  const access = await billing.evaluateExportAccess(req, rowCount, requestedFormat);
   if (!access.allowed) {
-    const billingStatus = billing.getStatus(req);
+    const billingStatus = await billing.getStatus(req);
     res.status(402).json({
       error: {
         code: 'PAYMENT_REQUIRED',
@@ -295,7 +299,7 @@ function download(req, res) {
   const { buffer, contentType } = buildExport(entry.dataset, requestedFormat);
   const filename = buildDownloadFilename(entry.name, requestedFormat);
 
-  if (access.billable) billing.consumeExport(access.entitlement);
+  if (access.billable) await billing.consumeExport(access.entitlement);
 
   res.status(200);
   res.set({
@@ -307,8 +311,8 @@ function download(req, res) {
   res.send(buffer);
 }
 
-function remove(req, res) {
-  fileStore.delete(req.params.id);
+async function remove(req, res) {
+  await fileStore.delete(req.params.id);
   res.status(204).end();
 }
 
